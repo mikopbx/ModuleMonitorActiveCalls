@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/semantic-ui@2.5.0/dist/semantic.min.css" />
+    <title>Состояние очереди Asterisk</title>
+    <style>
+        .ui.table tbody tr.row-available > td { background-color:#e8f5e9 !important; }
+        .ui.table tbody tr.row-in-call   > td { background-color:#e8f0fe !important; }
+        .ui.table tbody tr.row-dialing   > td { background-color: rgba(246, 229, 251, 0.65) !important; }
+        .ui.table tbody tr.row-offline   > td { background-color:#f5f5f5 !important; color:rgba(0,0,0,.45); }
+    </style>
+</head>
+<body>
+
+<div class="ui container">
+    <div class="ui segment stackable two column grid">
+        <div class="column">
+            <div class="ui top attached segment">
+                <h3 class="ui header">
+                    <i class="headphones icon" aria-hidden="true"></i>
+                    <div class="content"><span class="ui blue text">Отдел продаж</span></div>
+                </h3>
+            </div>
+
+            <div class="ui bottom attached segment">
+                <h4 class="ui dividing header">Ожидают</h4>
+                <div class="ui relaxed divided list">
+                    <div class="item">
+                        <i class="small teal phone volume icon" aria-hidden="true"></i>
+                        <div class="content">
+                            <div class="header">79161234567</div>
+                            <div class="description">ожидание: 00:01:23</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <i class="small teal phone volume icon" aria-hidden="true"></i>
+                        <div class="content">
+                            <div class="header">79261234568</div>
+                            <div class="description">ожидание: 00:00:47</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <i class="small teal phone volume icon" aria-hidden="true"></i>
+                        <div class="content">
+                            <div class="header">79031234569</div>
+                            <div class="description">ожидание: 00:02:05</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="column">
+            <div class="ui segment">
+                <h4 class="ui dividing header">Агенты</h4>
+                <table class="ui very basic compact single line table">
+                    <thead>
+                    <tr>
+                        <th>Агент</th>
+                        <th>Собеседник</th>
+                        <th></th>
+                        <th class="right aligned collapsing">Действия</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr class="row-available">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic green label" title="Доступен">
+                                            <i class="circle icon" aria-hidden="true"></i>1001
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Иванов Иван</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="right aligned">
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Позвонить" class="ui mini basic icon button"><i class="phone icon"></i></button>
+                        </td>
+                    </tr>
+
+                    <tr class="row-in-call">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic blue label" title="В разговоре">
+                                            <i class="phone volume icon" aria-hidden="true"></i>1002
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Петров Пётр</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td class>
+                            <i class="sign-out red icon" aria-hidden="true"></i>74952293044
+                        </td>
+                        <td>15c</td>
+                        <td class="right aligned">
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Присоединиться" class="ui mini basic icon button"><i class="users icon"></i></button>
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Подслушать" class="ui mini basic icon button"><i class="deaf icon"></i></button>
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Завершить" class="ui mini basic icon button"><i class="delete icon"></i></button>
+                        </td>
+                    </tr>
+
+                    <tr class="row-in-call">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic blue label" title="В разговоре">
+                                            <i class="phone volume icon" aria-hidden="true"></i>1002
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Петров Пётр</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <i class="sign-in icon" aria-hidden="true"></i>74952293042
+                        </td>
+                        <td>120c</td>
+                        <td class="right aligned">
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Присоединиться" class="ui mini basic icon button"><i class="users icon"></i></button>
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Подслушать" class="ui mini basic icon button"><i class="deaf icon"></i></button>
+                            <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Завершить" class="ui mini basic icon button"><i class="delete icon"></i></button>
+                        </td>
+                    </tr>
+
+                    <tr class="row-dialing">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic pink label" title="Дозвон (исходящий)">
+                                            <i class="angle double right icon" aria-hidden="true"></i>1003
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Сидорова Анна</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <i class="angle double right icon" aria-hidden="true"></i>79031234569
+                        </td>
+                        <td>—</td>
+                        <td class="right aligned"></td>
+                    </tr>
+
+                    <tr class="row-dialing">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic pink label" title="Дозвон (входящий)">
+                                            <i class="angle double left icon" aria-hidden="true"></i>1003
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Сидорова Анна</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <i class="angle double left red icon" aria-hidden="true"></i>74952293011
+                        </td>
+                        <td>—</td>
+                        <td class="right aligned"></td>
+                    </tr>
+
+                    <tr class="row-offline">
+                        <td>
+                            <div class="ui grid">
+                                <div class="four wide column">
+                                        <span class="ui mini basic grey label" title="Отключён">
+                                            <i class="ban icon" aria-hidden="true"></i>1003
+                                        </span>
+                                </div>
+                                <div class="twelve wide column">
+                                    <code>Сидорова Анна</code>
+                                </div>
+                            </div>
+                        </td>
+                        <td>—</td>
+                        <td>—</td>
+                        <td class="right aligned"></td>
+                    </tr>
+                    </tbody>
+                </table>
+
+                <div class="ui tiny labels">
+                    <div class="ui green label"><i class="circle icon" aria-hidden="true"></i> Доступен</div>
+                    <div class="ui blue label"><i class="phone volume icon" aria-hidden="true"></i> В разговоре</div>
+                    <div class="ui pink label"><i class="angle double right icon" aria-hidden="true"></i> Дозвон</div>
+                    <div class="ui grey label"><i class="ban icon" aria-hidden="true"></i> Отключён</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
