@@ -2,7 +2,7 @@
     "name": "mikopbx/moduletemplate",
     "description": "ModuleMonitorActiveCalls",
     "require": {
-        "mikopbx/core": ">=2020.2.757"
+        "cesargb/php-log-rotation": "2.6.0"
     },
     "autoload": {
         "psr-4": {

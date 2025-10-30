@@ -146,63 +146,8 @@ const ModuleMonitorActiveCalls = {
 				"number": "",
 				"queues": [],
 				"agents": {
-				// 	"201": {
-				// 		"state": "Ringing",
-				// 		"name": "Алексей"
-				// 	},
-				// 	"202": {
-				// 		"state": "Unavailable",
-				// 		"name": "Техник"
-				// 	},
-				// 	"203": {
-				// 		"state": "Ringing",
-				// 		"name": "Иван"
-				// 	}
 				},
 				"calls": [
-				// 	{
-				// 		"start": "1760937393.0",
-				// 		"answer": "",
-				// 		"typeCall": "incoming",
-				// 		"src_chan": "PJSIP/SIP-1692280724-00000000",
-				// 		"src_num": "74952293042",
-				// 		"dst_chan": "",
-				// 		"dst_num": "",
-				// 		"did": "3333",
-				// 		"linkedid": "mikopbx-1760937393.0",
-				// 		"calledChannels": [
-				// 			{
-				// 				"channel": "PJSIP/203-00000001",
-				// 				"number": "203"
-				// 			},
-				// 			{
-				// 				"channel": "PJSIP/201-00000002",
-				// 				"number": "201"
-				// 			}
-				// 		],
-				// 		"queueData": {
-				// 			"QueueID": "QUEUE-F38325E796B3FFB8938BA383AA119148",
-				// 			"EnterTime": 1760937397
-				// 		},
-				// 		"lastQueue": "QUEUE-F38325E796B3FFB8938BA383AA119148"
-				// 	},
-				// 	{
-				// 		"start": "1760937400.9",
-				// 		"answer": "",
-				// 		"typeCall": "incoming",
-				// 		"src_chan": "PJSIP/SIP-1692280724-00000003",
-				// 		"src_num": "74952293000",
-				// 		"dst_chan": "",
-				// 		"dst_num": "",
-				// 		"did": "3333",
-				// 		"linkedid": "mikopbx-1760937400.9",
-				// 		"calledChannels": [],
-				// 		"queueData": {
-				// 			"QueueID": "QUEUE-F38325E796B3FFB8938BA383AA119148",
-				// 			"EnterTime": 1760937400
-				// 		},
-				// 		"lastQueue": "QUEUE-F38325E796B3FFB8938BA383AA119148"
-				// 	}
 				]
 			},
 		});
@@ -214,53 +159,6 @@ const ModuleMonitorActiveCalls = {
 				userNumber: userNumber,
 				fullAccess: ($('#fullAccess').val() === "1" || userNumber === ''),
 				calls: [
-					// {
-					// 	"start": "1761644078.56",
-					// 	"answer": "",
-					// 	"typeCall": "inner",
-					// 	"src_chan": "PJSIP\/201-00000012",
-					// 	"src_num": "201",
-					// 	"exten": "",
-					// 	"dst_chan": "",
-					// 	"dst_num": "",
-					// 	"did": "",
-					// 	"linkedid": "mikopbx-1761644078.54",
-					// 	"calledChannels": [],
-					// 	"bridgeChannels": [],
-					// 	"spyer": true,
-					// 	"spy_num": "74952292344",
-					// 	"spy_chan": "PJSIP\/SIP-1692280724-0000000d",
-					// 	"queueData": [],
-					// 	"lastQueue": ""
-					// },
-					// {
-					// 	"start": "1761125329.175",
-					// 	"answer": "1761125349.404022",
-					// 	"typeCall": "incoming",
-					// 	"src_chan": "PJSIP\/SIP-1692280724-0000003d",
-					// 	"src_num": "74952293042",
-					// 	"dst_chan": "PJSIP\\/201-00000040",
-					// 	"dst_num": "201",
-					// 	"did": "2233",
-					// 	"linkedid": "mikopbx-1761125329.175",
-					// 	"calledChannels": [
-					// 		// {
-					// 		// 	"channel": "PJSIP\/201-00000040",
-					// 		// 	"number": "201",
-					// 		// }
-					// 	],
-					// 	"bridgeChannels": [
-					// 		// {
-					// 		// 	"answer": "1761125503.702850",
-					// 		// 	"src_chan": "PJSIP\/201-00000040",
-					// 		// 	"src_num": "201",
-					// 		// 	"dst_chan": "PJSIP\/203-00000041",
-					// 		// 	"dst_num": "203"
-					// 		// }
-					// 	],
-					// 	"queueData": [],
-					// 	"lastQueue": "QUEUE-F38325E796B3FFB8938BA383AA119148"
-					// }
 				]
 			},
 			methods: {
@@ -361,14 +259,6 @@ const ModuleMonitorActiveCalls = {
 				userNumber: userNumber,
 				fullAccess: ($('#fullAccess').val() === "1" || userNumber === ''),
 				calls: [
-					// {
-					// 	src_num: "203",
-					// 	src_chan: "PJSIP/203-00000007",
-					// 	dst_num: "201",
-					// 	dst_chan: 'PJSIP/201-00000008',
-					// 	did: '74952293042',
-					// 	uid: 'mikopbx-1719575091.11',
-					// },
 				]
 			},
 			methods: {
@@ -508,24 +398,6 @@ const ModuleMonitorActiveCalls = {
 		});
 	},
 	updateLines() {
-		// $.api({
-		// 	url: window[className].activeChannelsUrl,
-		// 	on: 'now',
-		// 	method: 'POST',
-		// 	successTest(response) {
-		// 		return response !== undefined && Object.keys(response).length > 0 && response.success === true;
-		// 	},
-		// 	onSuccess(response) {
-		// 		window[className].$widget.updatedCallsFromResponse(response.lines);
-		// 	},
-		// 	onFailure(response) {
-		// 		console.log(response);
-		// 	},
-		// 	onError(errorMessage, element, xhr) {
-		// 		console.log(errorMessage,xhr);
-		// 	}
-		// });
-
 		$.api({
 			url: window[className].activeChannelsUrlV2,
 			on: 'now',
