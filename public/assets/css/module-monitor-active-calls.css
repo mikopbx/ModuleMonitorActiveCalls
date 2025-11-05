@@ -1,0 +1,15 @@
+/*
+ * Copyright (C) MIKO LLC - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Nikolay Beketov, 9 2018
+ *
+ */
+
+.ui.table tbody tr.row-available > td { background-color:#e8f5e9 !important; }
+.ui.table tbody tr.row-in-spy > td { background-color: rgba(236, 200, 206, 0.58) !important; }
+.ui.table tbody tr.row-in-call   > td { background-color:#e8f0fe !important; }
+.ui.table tbody tr.row-dialing   > td { background-color: rgba(246, 229, 251, 0.65) !important; }
+.ui.table tbody tr.row-offline   > td { background-color:#f5f5f5 !important; color:rgba(0,0,0,.45); }
+.ui.table tbody tr.row-pause > td { background-color: #fff3e0 !important; color: rgba(0, 0, 0, 0.6) !important;
+}
