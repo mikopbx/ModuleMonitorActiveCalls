@@ -313,6 +313,7 @@ class WorkerActiveCalls extends WorkerBase
         if($newPrintHash <> $this->lastPrintHash){
             $this->lastPrintHash = $newPrintHash;
             CacheManager::setCacheData('getActiveChannelsV2Action', ['queues' => $queuesData, 'calls' => $calls], 80000);
+            CacheManager::setCacheData('getUsersStates', ['states' => $this->states], 80000);
         }
     }
 
