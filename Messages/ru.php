@@ -27,6 +27,7 @@ return [
     'module_monitorCalls_userNumberNotFound' => 'не найден',
     'module_monitorCalls_userNumberHelpMessage' => 'На этот номер будет поступать обратный звонок при использовании функций супервизора',
     'module_monitorCalls_needSelectQueue' => 'Выберите очередь',
+    'module_monitorCalls_minWaitVisible' => 'Только отвеченне и длительность ожидания более',
     'module_monitorCalls_waitingClients' => 'Ожидают',
     'module_monitorCalls_waitingTitleClient' => 'ожидание',
     'module_monitorCalls_columnTitleAgent' => 'Агент',

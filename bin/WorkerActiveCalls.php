@@ -507,7 +507,7 @@ class WorkerActiveCalls extends WorkerBase
     public function getPjSipPeers(): array
     {
         $peers  = [];
-        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints');
+        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints', [], 200000);
         $state_array = [
             'Not in use' => self::STATE_IDLE,
             'Busy'       => self::STATE_UP,
@@ -516,26 +516,28 @@ class WorkerActiveCalls extends WorkerBase
         ];
         $endpoints = $result['data']['EndpointList']??[];
         foreach ($endpoints as $index => $peer) {
-            if ($peer['ObjectName'] === 'anonymous' || !is_numeric($peer['Auths'])) {
+            if ($peer['ObjectName'] === 'anonymous') {
                 unset($endpoints[$index]);
                 continue;
-            }
-            if($peer['ObjectName'] === "{$peer['Auths']}-WS"){
+            }elseif (!is_numeric($peer['ObjectName'])){
                 continue;
             }
-            $peers[$peer['Auths']] = [
-                'id'        => $peer['Auths'],
+            $peers[$peer['ObjectName']] = [
+                'id'        => $peer['ObjectName'],
                 'state'     => $state_array[$peer['DeviceState']] ?? $peer['DeviceState']
             ];
+            unset($endpoints[$index]);
         }
 
         foreach ($endpoints as $peer) {
-            if($peer['ObjectName'] !== "{$peer['Auths']}-WS"){
-                continue;
-            }
-            $wsState = $state_array[$peer['DeviceState']];
-            if($wsState === self::STATE_IDLE){
-                $peers[$peer['Auths']]['state'] = $state_array[$peer['DeviceState']];
+            $dataObjectName = explode('-',$peer['ObjectName']);
+            $id     = $dataObjectName[0]??'';
+            $prefix = $dataObjectName[1]??'';
+            if(  is_numeric($id) && $prefix === 'WS' ){
+                $wsState = $state_array[$peer['DeviceState']];
+                if($wsState === self::STATE_IDLE){
+                    $peers[$id]['state'] = $state_array[$peer['DeviceState']];
+                }
             }
         }
         return array_values($peers);

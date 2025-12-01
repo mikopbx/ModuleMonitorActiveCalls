@@ -76,6 +76,7 @@ class ModuleMonitorActiveCallsController extends BaseController
             $user['username'] = "$user[callerid] <$user[number]>";
         }
         $this->view->usersArray = $users;
+
         $this->view->userRestrictions = implode(',', $userRestrictions);
 
         $this->view->userId = $userId;
@@ -83,17 +84,26 @@ class ModuleMonitorActiveCallsController extends BaseController
         $this->view->cid = $cid;
         $this->view->queueId = '';
 
-        $settings = UsersSettings::findFirst([
-            'userId=:userId: AND key=:key:',
+        $settings = UsersSettings::find([
+            'userId=:userId:',
             'bind' => [
                 'userId' => $userId,
-                'key' => 'queueId'
             ]
         ]);
-        if($settings){
-            $this->view->queueId  = $settings->value;
+        $minWaitVisible = 0;
+        foreach ($settings as $setting){
+            if('queueId' === $setting->key ){
+                $this->view->queueId  = $setting->value;
+            }elseif ('minWaitVisible' === $setting->key ){
+                $minWaitVisible = intval($setting->value);
+            }
         }
-
+        $minWaitVisibleVariants = [];
+        foreach ([0,10,20,30,40,50,60] as $value){
+            $minWaitVisibleVariants[] = ['id' => $value, 'active' => $minWaitVisible === $value, 'name' => $value];
+        }
+        $this->view->minWaitVisible = $minWaitVisibleVariants;
+        $this->view->minWaitVisibleValue  = $minWaitVisible;
     }
 
     /**
@@ -146,6 +156,23 @@ class ModuleMonitorActiveCallsController extends BaseController
                 $settings = new ModuleMonitorActiveCalls();
             }
             $settings->adminUserId = $data['adminUserId']??'';
+            $this->view->success = $settings->save();
+        }elseif (isset($data['minWaitVisible']) ){
+            [,,$userId,] = $this->getUserData();
+            $key = 'minWaitVisible';
+            $settings = UsersSettings::findFirst([
+                 'userId=:userId: AND key=:key:',
+                 'bind' => [
+                     'userId' => $userId,
+                     'key' => $key
+                 ]
+            ]);
+            if(!$settings){
+                $settings = new UsersSettings();
+                $settings->userId = $userId;
+                $settings->key = $key;
+            }
+            $settings->value = $data['minWaitVisible']??'';
             $this->view->success = $settings->save();
         }elseif (isset($data['queueId']) ){
             [,,$userId,] = $this->getUserData();

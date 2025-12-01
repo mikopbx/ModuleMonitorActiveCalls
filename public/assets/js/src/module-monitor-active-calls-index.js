@@ -37,6 +37,12 @@ const ModuleMonitorActiveCalls = {
 				window[className].onChangeSetting('adminUserId', value);
 			}
 		});
+		$("#minWaitVisible.dropdown.enable").dropdown({
+			onChange: function onChange(value, text, $choice) {
+				$('#minWaitVisibleValue').val(value);
+				window[className].onChangeSetting('minWaitVisible', value);
+			}
+		});
 		let userNumber = $('#userNumber').val();
 
 		window[className].$widgetQueues = new Vue({
@@ -45,6 +51,7 @@ const ModuleMonitorActiveCalls = {
 			methods: {
 				updatedCallsFromResponse(data) {
 					let queueNameEl = $(window[className].queueNameSelector);
+					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
 
 					this.queues = data.queues;
 					let queueId = $('#queueId').val();
@@ -142,6 +149,7 @@ const ModuleMonitorActiveCalls = {
 				}
 			},
 			data: {
+				"minWaitVisible": 30,
 				"name": "",
 				"number": "",
 				"queues": [],
@@ -156,6 +164,7 @@ const ModuleMonitorActiveCalls = {
 			el: '#calls',
 			delimiters: ["<%","%>"],
 			data: {
+				"minWaitVisible": 30,
 				userNumber: userNumber,
 				fullAccess: ($('#fullAccess').val() === "1" || userNumber === ''),
 				calls: [
@@ -191,6 +200,7 @@ const ModuleMonitorActiveCalls = {
 					return window[className].formatElapsedTime(call.answer);
 				},
 				updatedCallsFromResponse(data) {
+					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
 					// Проходим по всем очередям
 					for (const queueId in data.queues) {
 						const queue = data.queues[queueId];

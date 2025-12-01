@@ -205,7 +205,7 @@ class AsteriskManager
      * @param array $parameters The parameters for the request (optional).
      * @return array The response from the socket.
      */
-    public function sendRequestTimeout(string $action, array $parameters = []): array
+    public function sendRequestTimeout(string $action, array $parameters = [], int $waitDuration = 0): array
     {
         if (! is_resource($this->socket) && !$this->connectDefault()) {
             return [];
@@ -229,6 +229,9 @@ class AsteriskManager
 
         $response = [];
         if ($result) {
+            if($waitDuration>0){
+                usleep($waitDuration);
+            }
             $response = $this->waitResponse(true);
         }
         return $response;

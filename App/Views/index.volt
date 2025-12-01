@@ -7,6 +7,7 @@
 <input id="fullAccess" type="hidden" value="{{ fullAccess }}">
 <input id="session" type="hidden" value="{{ session }}">
 <input id="queueId" type="hidden" value="{{ queueId }}">
+<input id="minWaitVisibleValue" type="hidden" value="{{ minWaitVisibleValue }}">
 
 {% if cid !== "" %}
     <div class="ui label">
@@ -47,6 +48,20 @@
       </div>
   </div>
 </div>
+
+<div class="ui label">
+  {{ t._('module_monitorCalls_minWaitVisible') }}:
+  <div id="minWaitVisible" class="ui scrolling dropdown {% if isRootUser %} enable {% endif %}">
+      <div class="text">{{minWaitVisibleValue}}</div>
+      <i class="dropdown icon"></i>
+      <div class="menu">
+        {% for variant in minWaitVisible %}
+            <div class="item {% if variant['active'] %} active selected {% endif %}" data-value="{{variant['id']}}" data-text="{{variant['name']}}">{{variant['name']}}</div>
+        {% endfor %}
+      </div>
+  </div>
+</div>
+
 <br>
 <br>
 <div id="app-queue" class="ui">
@@ -71,7 +86,7 @@
             <div class="ui bottom attached segment">
                 <h4 class="ui dividing header"> {{ t._('module_monitorCalls_waitingClients') }} </h4>
                 <div class="ui relaxed divided list">
-                    <div v-for="call in calls" v-if="call.dst_chan===''" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
+                    <div v-for="call in calls" v-if="call.dst_chan==='' && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
                         <i class="small teal phone volume icon" aria-hidden="true"></i>
                         <div class="content">
                             <div class="header"><% call.src_num %> </div>
@@ -152,7 +167,8 @@
     </tr>
   </thead>
   <tbody>
-    <tr v-for="call in calls" :key="call.linkedid" :data-linked-id="call.linkedid" :class="{
+    <tr v-for="call in calls" v-if="call.dst_chan==='' && call.queueData.EnterTime !== undefined && minWaitVisible <= getWaitTime(call)"
+                        :key="call.linkedid" :data-linked-id="call.linkedid" :class="{
                                                                                     'row-in-spy': (call.spyer),
                                                                                     'row-in-call': (call.dst_num),
                                                                                     'row-pause': (call.dst_num === '' && call.bridgeChannels && call.bridgeChannels.length),
