@@ -171,6 +171,12 @@ const ModuleMonitorActiveCalls = {
 				]
 			},
 			methods: {
+				callIsVisible(call){
+					if(call.dst_chan==='' && call.queueData.EnterTime !== undefined ){
+						return this.minWaitVisible <= this.getWaitTime(call);
+					}
+					return true;
+				},
 				formatTimestampToTime(timestamp) {
 					// Если timestamp строка — приводим к числу
 					const ts = typeof timestamp === 'string' ? parseFloat(timestamp) : timestamp;

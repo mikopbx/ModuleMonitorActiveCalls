@@ -167,7 +167,7 @@
     </tr>
   </thead>
   <tbody>
-    <tr v-for="call in calls" v-if="call.dst_chan==='' && call.queueData.EnterTime !== undefined && minWaitVisible <= getWaitTime(call)"
+    <tr v-for="call in calls" v-if="callIsVisible(call)"
                         :key="call.linkedid" :data-linked-id="call.linkedid" :class="{
                                                                                     'row-in-spy': (call.spyer),
                                                                                     'row-in-call': (call.dst_num),

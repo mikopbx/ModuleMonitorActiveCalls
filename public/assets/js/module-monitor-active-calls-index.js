@@ -194,6 +194,12 @@ var ModuleMonitorActiveCalls = {
         calls: []
       },
       methods: {
+        callIsVisible: function callIsVisible(call) {
+          if (call.dst_chan === '' && call.queueData.EnterTime !== undefined) {
+            return this.minWaitVisible <= this.getWaitTime(call);
+          }
+          return true;
+        },
         formatTimestampToTime: function formatTimestampToTime(timestamp) {
           // Если timestamp строка — приводим к числу
           var ts = typeof timestamp === 'string' ? parseFloat(timestamp) : timestamp;
