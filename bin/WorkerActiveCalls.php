@@ -36,7 +36,9 @@ class WorkerActiveCalls extends WorkerBase
 {
     public Logger $logger;
     private bool $init = true;
-    private string $lastPrintHash= '';
+    private string $lastPrintHash = '';
+    private int $lastPrintCalls = 0;
+    private int $lastControlActiveCalls = 0;
     /** @var AsteriskManager $am */
     protected AsteriskManager $am;
     protected CustomAsteriskManager $amCustom;
@@ -114,7 +116,34 @@ class WorkerActiveCalls extends WorkerBase
                 LOG_WARNING
             );
         }
+
+
         return false;
+    }
+
+    private function channelAdditionalControle()
+    {
+        if(empty($this->activeChannels)){
+            return;
+        }
+        try{
+            $channelsData = WorkerAmiActions::invokeApi('getChannels', []);
+            if(!empty($channelsData)){
+                $ids = array_keys($channelsData);
+                $chanIds = array_keys($this->activeChannels);
+                foreach ($chanIds as $id){
+                    if(!in_array($id, $ids)){
+                        unset($this->activeChannels[$id]);
+                    }
+                }
+            }
+        }catch (Throwable $e){
+            SystemMessages::sysLogMsg(
+                static::class,
+                "Channel contole: " . $e->getMessage(),
+                LOG_WARNING
+            );
+        }
     }
 
     /**
@@ -174,6 +203,10 @@ class WorkerActiveCalls extends WorkerBase
     {
         if($this->init){
             return;
+        }
+        if(time() - $this->lastControlActiveCalls > 60 && !empty($this->activeChannels)){
+            $this->lastControlActiveCalls = time();
+            $this->channelAdditionalControle();
         }
 
         $queuesData = $this->queuesData;

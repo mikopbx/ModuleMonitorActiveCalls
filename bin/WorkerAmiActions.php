@@ -147,6 +147,12 @@ class WorkerAmiActions extends WorkerBase
         return $res;
     }
 
+    public function getChannels()
+    {
+        $am = Util::getAstManager('off');
+        return $am->GetChannels();
+    }
+
     /**
      * Сериализует данные и сохраняет их во временный файл.
      * @param $data
