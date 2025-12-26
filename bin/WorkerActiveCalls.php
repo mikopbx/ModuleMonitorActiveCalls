@@ -18,6 +18,8 @@
  */
 namespace Modules\ModuleMonitorActiveCalls\bin;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\GuzzleException;
 use MikoPBX\Common\Models\CallQueueMembers;
 use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
@@ -37,6 +39,7 @@ class WorkerActiveCalls extends WorkerBase
     public Logger $logger;
     private bool $init = true;
     private string $lastPrintHash = '';
+    private string $lastPrintUserHash = '';
     private int $lastPrintCalls = 0;
     private int $lastControlActiveCalls = 0;
     /** @var AsteriskManager $am */
@@ -346,8 +349,31 @@ class WorkerActiveCalls extends WorkerBase
         if($newPrintHash <> $this->lastPrintHash){
             $this->lastPrintHash = $newPrintHash;
             CacheManager::setCacheData('getActiveChannelsV2Action', ['queues' => $queuesData, 'calls' => $calls], 80000);
-            CacheManager::setCacheData('getUsersStates', ['states' => $this->states], 80000);
         }
+        $data = ['states' => $this->states];
+        $dataPrint = json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        $newPrintHash = md5($dataPrint);
+        if($newPrintHash <> $this->lastPrintUserHash){
+            $this->lastPrintUserHash = $newPrintHash;
+            CacheManager::setCacheData('getUsersStates', $data, 80000);
+            if(file_exists('/etc/nginx/mikopbx/modules_locations/ModuleSoftphoneBackend.conf')){
+                try {
+                    $client = new Client([
+                        'base_uri'        => 'http://127.0.0.1/pbxcore/api/module-softphone-backend/v1/',
+                        'connect_timeout' => 1.0,
+                        'timeout'         => 1.0,
+                    ]);
+                    $client->post('pub/users-state', [
+                        'connect_timeout' => 1.0,
+                        'timeout'         => 1.0,
+                        'json' => $data,
+                    ]);
+                } catch (GuzzleException $e) {
+                    unset($e);
+                }
+            }
+        }
+        
     }
 
     /**
