@@ -18,8 +18,6 @@
  */
 namespace Modules\ModuleMonitorActiveCalls\bin;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\Exception\GuzzleException;
 use MikoPBX\Common\Models\CallQueueMembers;
 use MikoPBX\Common\Models\CallQueues;
 use MikoPBX\Common\Models\Extensions;
@@ -31,6 +29,7 @@ use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
+use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController;
 
 require_once 'Globals.php';
 
@@ -356,19 +355,10 @@ class WorkerActiveCalls extends WorkerBase
         if($newPrintHash <> $this->lastPrintUserHash){
             $this->lastPrintUserHash = $newPrintHash;
             CacheManager::setCacheData('getUsersStates', $data, 80000);
-            if(file_exists('/etc/nginx/mikopbx/modules_locations/ModuleSoftphoneBackend.conf')){
+            if(class_exists('\Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController')){
                 try {
-                    $client = new Client([
-                        'base_uri'        => 'http://127.0.0.1/pbxcore/api/module-softphone-backend/v1/',
-                        'connect_timeout' => 1.0,
-                        'timeout'         => 1.0,
-                    ]);
-                    $client->post('pub/users-state', [
-                        'connect_timeout' => 1.0,
-                        'timeout'         => 1.0,
-                        'json' => $data,
-                    ]);
-                } catch (GuzzleException $e) {
+                    ApiController::publishUserStates($data);
+                }catch (\Exception $e){
                     unset($e);
                 }
             }
