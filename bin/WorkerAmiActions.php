@@ -20,6 +20,7 @@
 namespace Modules\ModuleMonitorActiveCalls\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\Asterisk\AsteriskManager;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\SystemMessages;
@@ -27,6 +28,7 @@ use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
 use Modules\ModuleMonitorActiveCalls\Lib\MikoPBXVersion;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 
 class WorkerAmiActions extends WorkerBase
 {
@@ -45,6 +47,21 @@ class WorkerAmiActions extends WorkerBase
     {
         parent::signalHandler($signal);
         cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+        $this->needRestart = true;
+    }
+
+
+    /**
+     * Подключение к AMI.
+     * @param string $events
+     * @return AsteriskManager
+     */
+    public static function getAstManager(string $events = 'on'):AsteriskManager
+    {
+        $am     = new AsteriskManager();
+        $port   = PbxSettings::getValueByKey('AMIPort');
+        $am->connect("127.0.0.1:$port", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER, $events);
+        return $am;
     }
 
     /**
@@ -54,13 +71,14 @@ class WorkerAmiActions extends WorkerBase
      */
     public function start($argv):void
     {
-        $this->am = Util::getAstManager();
+        $this->am = self::getAstManager();
         $beanstalk      = new BeanstalkClient(self::class);
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
         while ($this->needRestart === false) {
             $beanstalk->wait();
         }
+        $this->am->disconnect();
     }
 
     /**
@@ -115,31 +133,24 @@ class WorkerAmiActions extends WorkerBase
 
         if('join' === $action) {
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $request['data']['number'], $variable);
-
+            $this->am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qBS'");
         }elseif ('whisper' === $action){
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $request['data']['number'], $variable);
-
+            $this->am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qw'");
         }elseif ('listen' === $action){
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $request['data']['number'], $variable);
-
+            $this->am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qoS'");
         }elseif ('hangup' === $action){
-            $am = Util::getAstManager('off');
-            $am->Hangup($request['data']['ch1']??'');
+            $this->am->Hangup($request['data']['ch1']??'');
         }else{
             $res->success    = false;
             $res->messages[] = 'API action not found in moduleRestAPICallback ModuleMonitorActiveCalls '.$action;
@@ -149,8 +160,7 @@ class WorkerAmiActions extends WorkerBase
 
     public function getChannels()
     {
-        $am = Util::getAstManager('off');
-        return $am->GetChannels();
+        return $this->am->getChannels();
     }
 
     /**

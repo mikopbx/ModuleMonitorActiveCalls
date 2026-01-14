@@ -9,17 +9,15 @@
 
 namespace Modules\ModuleMonitorActiveCalls\Lib;
 
-use MikoPBX\Core\System\SystemMessages;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\Config\ConfigClass;
-use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
-use Modules\ModuleMonitorActiveCalls\bin\ActiveCallsFromCdr;
 use Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls;
 use Modules\ModuleMonitorActiveCalls\bin\WorkerAmiActions;
 
 class MonitorActiveCallsConf extends ConfigClass
 {
+    public const AMI_USER = 'monitor-active-calls';
 
     /**
      * Receive information about mikopbx main database changes
@@ -38,12 +36,6 @@ class MonitorActiveCallsConf extends ConfigClass
     public function getModuleWorkers(): array
     {
         return [
-            /*
-            [
-                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
-                'worker' => ActiveCallsFromCdr::class,
-            ],
-            //*/
             [
                 'type'   => WorkerSafeScriptsCore::CHECK_BY_BEANSTALK,
                 'worker' => WorkerAmiActions::class,
@@ -53,6 +45,28 @@ class MonitorActiveCallsConf extends ConfigClass
                 'worker' => WorkerActiveCalls::class,
             ],
         ];
+    }
+
+    /**
+     * Генератор секции пиров для manager.conf
+     *
+     *
+     * @return string
+     */
+    public function generateManagerConf(): string
+    {
+        $arr_params  = array_merge(WorkerActiveCalls::CALL_EVENTS, WorkerActiveCalls::QUEUE_EVENTS);
+        $conf        = "[".self::AMI_USER."]" . PHP_EOL;
+        $conf        .= "secret=".self::AMI_USER . PHP_EOL;
+        $conf        .= 'deny=0.0.0.0/0.0.0.0' . PHP_EOL;
+        $conf        .= 'permit=127.0.0.1/255.255.255.255' . PHP_EOL;
+        $conf        .= 'read=system,agent,call,cdr,user' . PHP_EOL;
+        $conf        .= 'write=system,agent,call,originate' . PHP_EOL;
+        $conf        .= 'eventfilter=!UserEvent: CdrConnector' . PHP_EOL;
+        $conf        .= 'eventfilter=Event: (' . implode('|', $arr_params) . ')' . PHP_EOL;
+        $conf        .= PHP_EOL;
+
+        return $conf;
     }
 
     /**

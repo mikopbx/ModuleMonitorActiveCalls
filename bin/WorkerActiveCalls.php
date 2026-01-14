@@ -29,6 +29,7 @@ use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController;
 
 require_once 'Globals.php';
@@ -59,7 +60,9 @@ class WorkerActiveCalls extends WorkerBase
     public const STATE_ONHOLD       = 'OnHold';
     public const STATE_RING         = 'Ring';
     public const STATE_UNAVAILIBLE  = 'Unavailable';
-    private const CALL_EVENTS = [
+    public const CALL_EVENTS = [
+        'UserEvent',
+        'ExtensionStatus',
         'NewCallerid',
         'BridgeEnter',
         'BridgeLeave',
@@ -89,7 +92,7 @@ class WorkerActiveCalls extends WorkerBase
 
     public const CALL_TYPE_IN = 'incoming';
 
-    private const QUEUE_EVENTS = [
+    public const QUEUE_EVENTS = [
         'QueueCallerJoin',
         'QueueMemberStatus',
         'QueueCallerLeave'
@@ -648,9 +651,8 @@ class WorkerActiveCalls extends WorkerBase
     private function initManagerAsterisk():void
     {
         $amiPort  = PbxSettings::getValueByKey('AMIPort');
-
         $this->amCustom = new CustomAsteriskManager(); // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
-        $this->amCustom->connect("127.0.0.1:$amiPort");
+        $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
 
         $pingTube = $this->makePingTubeName(self::class);
         $params = ['Operation' => 'Add', 'Filter' => 'UserEvent: '.$pingTube];
