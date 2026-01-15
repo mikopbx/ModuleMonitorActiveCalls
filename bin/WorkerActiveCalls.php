@@ -293,13 +293,13 @@ class WorkerActiveCalls extends WorkerBase
                     $tmpBridgeStart = time();
                     $tmpChFound = $this->findBridgeChannel($linkedid,$tmpDstChannel, $tmpBridgeStart);
                     if(!$tmpChFound){
-                        // Идет дозвони.
+                        // Идет дозвон.
                         $call['calledChannels'][] = [
                             'channel' => $channel,
                             'number'  => $channelData['CallerIDNum'],
                         ];
                     }elseif(!isset($bridgeChannels[$channel])){
-                        // Вероятная переадресация с кнсультацией. Начальный канал в ожидании.
+                        // Вероятная переадресация с консультацией. Начальный канал в ожидании.
                         $bridgeChannels[$channel] = true;
                         $bridgeChannels[$tmpDstChannel] = true;
 
