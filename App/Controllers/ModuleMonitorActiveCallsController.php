@@ -17,6 +17,7 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use Modules\ModuleMonitorActiveCalls\App\Forms\ModuleMonitorActiveCallsForm;
 use Modules\ModuleMonitorActiveCalls\bin\WorkerAmiActions;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
 use Modules\ModuleMonitorActiveCalls\Models\ModuleMonitorActiveCalls;
 use Modules\ModuleMonitorActiveCalls\Models\UsersSettings;
 use Modules\ModuleUsersUI\Lib\Constants;
@@ -149,8 +150,7 @@ class ModuleMonitorActiveCallsController extends BaseController
 
     public function backandEnableAction() :void
     {
-        $result = PbxExtensionModules::findFirstByUniqid("ModuleSoftphoneBackend");
-        if ($result !== null && intval($result->disabled ) === 0) {
+        if (MonitorActiveCallsMain::backendExists()) {
             // Модуль включен.
             $api = new ModuleSoftphoneBackendApi();
             $api->initialize();

@@ -24,19 +24,21 @@ use MikoPBX\Common\Models\Extensions;
 use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\System\SystemMessages;
 use Modules\ModuleMonitorActiveCalls\Lib\AsteriskManager as CustomAsteriskManager;
-use MikoPBX\Core\Asterisk\AsteriskManager;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\Core\System\Util;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
-use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
+use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController AS BackendApiController;
 
 require_once 'Globals.php';
 
 class WorkerActiveCalls extends WorkerBase
 {
     public Logger $logger;
+
+    private  bool $backendExists = false;
     private bool $init = true;
     private string $lastPrintHash = '';
     private string $lastPrintUserHash = '';
@@ -157,6 +159,8 @@ class WorkerActiveCalls extends WorkerBase
     {
         $this->logger = new Logger('ActiveCalls', 'ModuleMonitorActiveCalls');
         $this->logger->writeInfo('Starting...');
+
+        $this->backendExists = MonitorActiveCallsMain::backendExists();
         $this->initManagerAsterisk();
         $this->getExtensionsInfo();
         $this->updateStates();
@@ -361,29 +365,29 @@ class WorkerActiveCalls extends WorkerBase
             $queuesData[$qId]['agents'] = $availableAgents + $unavailableAgents;
         }
 
-        $dataPrint = json_encode(['queues' => $queuesData, 'calls' => $calls], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        $callData = ['queues' => $queuesData, 'calls' => $calls];
+        $dataPrint = json_encode($callData, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintHash){
             $this->lastPrintHash = $newPrintHash;
-            CacheManager::setCacheData('getActiveChannelsV2Action', ['queues' => $queuesData, 'calls' => $calls], 80000);
+            CacheManager::setCacheData('getActiveChannelsV2Action', $callData, 80000);
+            if($this->backendExists) {
+                BackendApiController::publishActiveCalls($callData);
+            }
         }
+        unset($callData);
+
         $data = ['states' => $this->states];
-        $dataPrint = json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        $dataPrint = json_encode($data, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintUserHash){
             $this->lastPrintUserHash = $newPrintHash;
             CacheManager::setCacheData('getUsersStates', $data, 80000);
-            if(class_exists('\Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController')){
-                try {
-                    $this->logger->writeInfo('publishUserStates...');
-                    ApiController::publishUserStates($data);
-                    $this->logger->writeInfo('end publishUserStates...');
-                }catch (\Exception $e){
-                    unset($e);
-                }
+            if($this->backendExists){
+                BackendApiController::publishUserStates($data);
             }
         }
-        
+
     }
 
     /**
@@ -861,6 +865,7 @@ class WorkerActiveCalls extends WorkerBase
             $this->logger->writeInfo($parameters,'update settings...');
             $this->getExtensionsInfo();
             $this->collectQueuesInfo();
+            $this->backendExists = MonitorActiveCallsMain::backendExists();
             return;
         }
         if($parameters['Event'] === 'ExtensionStatus'){

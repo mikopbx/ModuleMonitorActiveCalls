@@ -637,8 +637,17 @@ const ModuleMonitorActiveCalls = {
 		$('.ui.clearing.hidden.divider').remove();
 		// Окончание форматирования базовой страницы
 		//////
+		this.startPollingActiveCalls();
+	},
+	startPollingActiveCalls() {
+		if (this._activeCallsPollTimer) return;
 		window[className].updateLines();
-		setInterval(window[className].updateLines, 2000);
+		this._activeCallsPollTimer = setInterval(window[className].updateLines, 2000);
+	},
+	stopPollingActiveCalls() {
+		if (!this._activeCallsPollTimer) return;
+		clearInterval(this._activeCallsPollTimer);
+		this._activeCallsPollTimer = null;
 	},
 	async initContactsCache() {
 		try {
@@ -727,6 +736,7 @@ const ModuleMonitorActiveCalls = {
 				if (accessToken && refreshToken) {
 					window[className].setAuthTokens(accessToken, refreshToken);
 					window[className].connectContactsWs();
+					window[className].connectActiveCallsWs();
 				}
 			},
 			onFailure(response) {
@@ -842,6 +852,69 @@ const ModuleMonitorActiveCalls = {
 			this.scheduleContactsWsReconnect('init_error', this.isAccessTokenExpired(0));
 		}
 	},
+	scheduleActiveCallsWsReconnect(reason, forceReAuth = false) {
+		if (this._activeCallsWsReconnectTimer) {
+			clearTimeout(this._activeCallsWsReconnectTimer);
+			this._activeCallsWsReconnectTimer = null;
+		}
+		this._activeCallsWsReconnectAttempt = (this._activeCallsWsReconnectAttempt || 0) + 1;
+		const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._activeCallsWsReconnectAttempt - 1)));
+		this._activeCallsWsReconnectTimer = setTimeout(() => {
+			if (forceReAuth || this.isAccessTokenExpired(5)) {
+				this.requestBackendEnable();
+			} else {
+				this.connectActiveCallsWs();
+			}
+		}, delay);
+		console.log('active-calls ws reconnect scheduled', { reason, delayMs: delay });
+	},
+	connectActiveCallsWs() {
+		try {
+			const accessToken = this._authTokens?.access_token;
+			if (!accessToken) return;
+
+			// Avoid reconnecting if already connected/connecting
+			if (this._activeCallsWs && (this._activeCallsWs.readyState === WebSocket.OPEN || this._activeCallsWs.readyState === WebSocket.CONNECTING)) {
+				return;
+			}
+			// Reset backoff on explicit connect attempt
+			this._activeCallsWsReconnectAttempt = 0;
+
+			// Token exists -> use WS, disable polling fallback
+			this.stopPollingActiveCalls();
+
+			const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			const wsHost = window.location.host; // host:port of current page
+			const tokenParam = encodeURIComponent(accessToken);
+			const wsUrl = `${wsProto}://${wsHost}/pbxcore/api/module-softphone-backend/v1/sub/active-calls?authorization=${tokenParam}`;
+
+			this._activeCallsWs = new WebSocket(wsUrl);
+			this._activeCallsWs.onopen = () => {
+				console.log('active-calls ws connected');
+				// Reuse the same token refresh timer (it triggers requestBackendEnable)
+				this.scheduleContactsWsTokenRefresh();
+			};
+			this._activeCallsWs.onmessage = (event) => {
+				this.handleActiveCallsWsMessage(event?.data);
+			};
+			this._activeCallsWs.onerror = (event) => {
+				console.log('active-calls ws error', event);
+			};
+			this._activeCallsWs.onclose = (event) => {
+				const code = event?.code;
+				const reason = event?.reason;
+				console.log('active-calls ws closed', { code, reason });
+
+				// Auth closes vary by server implementation.
+				const authCloseCodes = new Set([1008, 4001, 4401, 4403]);
+				const forceReAuth = authCloseCodes.has(code) || this.isAccessTokenExpired(0);
+				this.scheduleActiveCallsWsReconnect('close', forceReAuth);
+			};
+		} catch (e) {
+			console.log('active-calls ws init error', e);
+			this.scheduleActiveCallsWsReconnect('init_error', this.isAccessTokenExpired(0));
+		}
+	},
 	handleContactsWsMessage(data) {
 		try {
 			if (!data) return;
@@ -862,6 +935,20 @@ const ModuleMonitorActiveCalls = {
 			}
 		} catch (e) {
 			console.log('contacts ws parse error', e);
+		}
+	},
+	handleActiveCallsWsMessage(data) {
+		try {
+			if (!data) return;
+			const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+			const payload = parsed?.queues ? parsed : (parsed?.data?.queues ? parsed.data : null);
+			if (!payload) return;
+			if (!window[className].$widgetQueues || !window[className].$callsWidget) return;
+
+			window[className].$widgetQueues.updatedCallsFromResponse(payload);
+			window[className].$callsWidget.updatedCallsFromResponse(payload);
+		} catch (e) {
+			console.log('active-calls ws parse error', e);
 		}
 	},
 	formatElapsedTime(enterTime) {
