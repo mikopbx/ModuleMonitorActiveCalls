@@ -40,10 +40,7 @@ class WorkerActiveCalls extends WorkerBase
     private bool $init = true;
     private string $lastPrintHash = '';
     private string $lastPrintUserHash = '';
-    private int $lastPrintCalls = 0;
     private int $lastControlActiveCalls = 0;
-    /** @var AsteriskManager $am */
-    protected AsteriskManager $am;
     protected CustomAsteriskManager $amCustom;
     private array $activeChannels = [];
     private array $states = [];
@@ -158,13 +155,11 @@ class WorkerActiveCalls extends WorkerBase
      */
     public function start($argv):void
     {
-        $this->logger = new Logger('ActiveCalls', 'WorkerActiveCalls');
+        $this->logger = new Logger('ActiveCalls', 'ModuleMonitorActiveCalls');
         $this->logger->writeInfo('Starting...');
         $this->initManagerAsterisk();
-
         $this->getExtensionsInfo();
         $this->updateStates();
-        $this->logger->writeInfo('Collect active lines...');
 
         $this->collectActiveChannels();
         $this->collectActiveBridges();
@@ -177,6 +172,7 @@ class WorkerActiveCalls extends WorkerBase
             $this->amCustom->waitUserEvent(true);
             if (!$this->amCustom->loggedIn()) {
                 sleep(1);
+                $this->logger->writeInfo('initManagerAsterisk...');
                 $this->initManagerAsterisk();
             }
         }
@@ -360,7 +356,9 @@ class WorkerActiveCalls extends WorkerBase
             CacheManager::setCacheData('getUsersStates', $data, 80000);
             if(class_exists('\Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController')){
                 try {
+                    $this->logger->writeInfo('publishUserStates...');
                     ApiController::publishUserStates($data);
+                    $this->logger->writeInfo('end publishUserStates...');
                 }catch (\Exception $e){
                     unset($e);
                 }
@@ -651,7 +649,8 @@ class WorkerActiveCalls extends WorkerBase
     private function initManagerAsterisk():void
     {
         $amiPort  = PbxSettings::getValueByKey('AMIPort');
-        $this->amCustom = new CustomAsteriskManager(); // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
+        $this->amCustom = new CustomAsteriskManager();
+        // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
         $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
 
         $pingTube = $this->makePingTubeName(self::class);

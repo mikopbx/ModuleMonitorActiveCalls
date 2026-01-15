@@ -99,48 +99,47 @@
 
         <div class="ten wide column">
             <div class="ui segment">
-                <table class="ui very basic compact single line table">
-                    <thead>
-                    <tr>
-                        <th>{{ t._('module_monitorCalls_columnTitleAgent') }}</th>
-                        <th>{{ t._('module_monitorCalls_columnTitleSob') }}</th>
-                        <th></th>
-                        <th class="right aligned collapsing"></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    <tr v-for="(agent, number) in agents"  class="" :class="{
-                                                                             'row-available': agent.state === 'Idle',
-                                                                             'row-in-call': (agent.state === 'Up'),
-                                                                             'row-dialing': (agent.state === 'Ringing' || agent.state === 'Ring' || agent.state === 'Busy'),
-                                                                             'row-offline': agent.state === 'Unavailable'
-                                                                           }">
-                        <td>
-                            <div class="ui grid">
-                                <div class="four wide column">
-                                    <span class="ui mini basic label" title="":class="{
-                                                                                       'green': agent.state === 'Idle',
-                                                                                       'blue': (agent.state === 'Up'),
-                                                                                       'pink': (agent.state === 'Ringing' || agent.state === 'Ring' || agent.state === 'Busy'),
-                                                                                       'grey': agent.state === 'Unavailable'
-                                                                                     }">
-                                        <i class="circle icon" aria-hidden="true"></i> <% number %>
-                                    </span>
+                <div class="ui cards agent-cards">
+                    <div
+                        v-for="(agent, number) in agents"
+                        :key="number"
+                        class="ui card agent-card"
+                        :class="{
+                            'row-available': agent.state === 'Idle',
+                            'row-in-call': (agent.state === 'Up'),
+                            'row-dialing': (agent.state === 'Ringing' || agent.state === 'Ring' || agent.state === 'Busy'),
+                            'row-offline': agent.state === 'Unavailable'
+                        }"
+                    >
+                        <div class="content">
+                            <div class="header agent-card-header">
+                                <span
+                                    class="ui mini basic label agent-num-label"
+                                    :class="{
+                                        'green': agent.state === 'Idle',
+                                        'blue': (agent.state === 'Up'),
+                                        'pink': (agent.state === 'Ringing' || agent.state === 'Ring' || agent.state === 'Busy'),
+                                        'grey': agent.state === 'Unavailable'
+                                    }"
+                                >
+                                    <% number %>
+                                </span>
+                                <span class="agent-name"><% agent.name %></span>
+                            </div>
+
+                            <div class="meta agent-peer" v-if="hasPeerPhone(number)">
+                                <div class="peer-line">
+                                    <i class="phone icon" aria-hidden="true"></i>
+                                    <span class="agent-phone"><% getPeerPhoneLabel(number) %></span>
                                 </div>
-                                <div class="twelve wide column">
-                                    <code><% agent.name %></code>
+                                <div class="peer-line peer-name">
+                                    <i class="user outline icon" aria-hidden="true"></i>
+                                    <span><% getPeerNameLabel(number) %></span>
                                 </div>
                             </div>
-                        </td>
-                        <td><% getSrcNumForAgent(number) || '—' %></td>
-                        <td>—</td>
-                        <td class="right aligned">
-<!--                             <button data-ch1="PJSIP/201-0000005c" data-ch2="PJSIP/203-0000005d" data-tooltip="Позвонить" class="ui mini basic icon button"><i class="phone icon"></i></button> -->
-                        </td>
-                    </tr>
-
-                    </tbody>
-                </table>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="ui tiny labels">
                     <div class="ui green label"><i class="circle icon" aria-hidden="true"></i> {{ t._('module_monitorCalls_legendTitleIdle') }} </div>

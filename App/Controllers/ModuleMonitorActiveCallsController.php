@@ -56,6 +56,7 @@ class ModuleMonitorActiveCallsController extends BaseController
         $headerCollectionCSS->addCss("css/cache/$this->moduleUniqueID/module-monitor-active-calls.css", true);
         $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
         $headerCollectionCSS->addCss('css/vendor/semantic/comment.css', true);
+        $headerCollectionCSS->addCss('css/vendor/semantic/card.css', true);
         $headerCollectionCSS->addCss('css/vendor/semantic/list.css', true);
 
         $this->view->form = new ModuleMonitorActiveCallsForm();

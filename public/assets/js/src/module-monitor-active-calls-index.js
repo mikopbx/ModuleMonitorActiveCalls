@@ -77,9 +77,131 @@ const ModuleMonitorActiveCalls = {
 							window[className].isInit = false;
 						}
 					}
+
+					// Normalize Semantic UI Card typography after render
+					this.$nextTick(() => {
+						this.normalizeAgentCards();
+					});
 				},
 				formatElapsedTime(enterTime) {
 					return window[className].formatElapsedTime(enterTime);
+				},
+				normalizeAgentCards() {
+					if (!this.$el) return;
+
+					// Cleanup artifacts from previous experiments (placeholders/spacers).
+					const artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
+					artifacts.forEach((el) => el.remove());
+
+					// Masonry-like layout via CSS columns to avoid empty gaps with different card heights.
+					// We inject styles here because this project restricts edits to /public/assets/js/src/.
+					this.ensureAgentCardsMasonry();
+
+					// Prevent "equal height" cards in one row (Semantic UI cards are flex).
+					const cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
+					if (cardsContainer) {
+						cardsContainer.style.alignItems = 'flex-start';
+						cardsContainer.style.alignContent = 'flex-start';
+					}
+
+					const cards = this.$el.querySelectorAll('.ui.cards.agent-cards > .ui.card.agent-card');
+					cards.forEach((card) => {
+						card.style.alignSelf = 'flex-start';
+					});
+
+					// Semantic UI makes .header bigger than normal text; we need same font size.
+					const headers = this.$el.querySelectorAll('.ui.card.agent-card .header.agent-card-header');
+					headers.forEach((el) => {
+						el.style.fontSize = '1em';
+						el.style.lineHeight = '1.2';
+					});
+
+					const metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
+					metas.forEach((el) => {
+						el.style.fontSize = '1em';
+						el.style.lineHeight = '1.2';
+					});
+
+					// Normalize label/name typography so they have same text height.
+					const numLabels = this.$el.querySelectorAll('.ui.card.agent-card .agent-num-label');
+					numLabels.forEach((el) => {
+						el.style.fontSize = '1em';
+						el.style.lineHeight = '1.2';
+						el.style.display = 'inline-flex';
+						el.style.alignItems = 'center';
+						el.style.paddingTop = '0';
+						el.style.paddingBottom = '0';
+					});
+					const names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
+					names.forEach((el) => {
+						el.style.lineHeight = '1.2';
+						el.style.display = 'inline-flex';
+						el.style.alignItems = 'center';
+					});
+
+					// Tune vertical gap between cards so that:
+					// 2 * (shortCardHeight + gap) ~= (tallCardHeight + gap)
+					// This makes the masonry columns visually "grid-like".
+					this.adjustAgentCardsGap();
+				},
+				adjustAgentCardsGap() {
+					if (!this.$el) return;
+					const container = this.$el.querySelector('.ui.cards.agent-cards');
+					if (!container) return;
+
+					const cards = Array.from(container.querySelectorAll('.ui.card.agent-card'));
+					if (!cards.length) return;
+
+					const tallCard = cards.find((c) => c.querySelector('.meta.agent-peer'));
+					const shortCard = cards.find((c) => !c.querySelector('.meta.agent-peer'));
+					if (!tallCard || !shortCard) return;
+
+					const ht = tallCard.getBoundingClientRect().height;
+					const hs = shortCard.getBoundingClientRect().height;
+					if (!ht || !hs) return;
+
+					// From 2*(hs+g) = ht+g => g = ht - 2*hs
+					let gap = ht - 2 * hs;
+					if (!Number.isFinite(gap)) return;
+
+					// Clamp to sane range; negative means "no extra gap needed".
+					gap = Math.max(0, Math.min(20, Math.round(gap)));
+
+					container.style.setProperty('--agent-card-gap', `${gap}px`);
+				},
+				ensureAgentCardsMasonry() {
+					const styleId = 'agent-cards-masonry-style';
+					if (!document.getElementById(styleId)) {
+						const styleEl = document.createElement('style');
+						styleEl.id = styleId;
+						styleEl.textContent = `
+/* Masonry layout for agents cards (scoped) */
+.ui.cards.agent-cards.agent-cards-masonry {
+  display: block !important;
+  column-width: 240px;
+  column-gap: 1em;
+  /* Prevent overlap with the legend block below */
+  margin-bottom: 1em !important;
+  padding-bottom: 0.5em !important;
+}
+.ui.cards.agent-cards.agent-cards-masonry > .ui.card.agent-card {
+  display: inline-block !important;
+  width: 100% !important;
+  margin: 0 0 var(--agent-card-gap, 12px) 0 !important;
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  page-break-inside: avoid;
+}
+						`.trim();
+						document.head.appendChild(styleEl);
+					}
+
+					const cardsContainer = this.$el && this.$el.querySelector
+						? this.$el.querySelector('.ui.cards.agent-cards')
+						: null;
+					if (cardsContainer) {
+						cardsContainer.classList.add('agent-cards-masonry');
+					}
 				},
 				getSrcNumForAgent(agentNumber) {
 					let result = '-';
@@ -146,6 +268,19 @@ const ModuleMonitorActiveCalls = {
 						}
 					}
 					return result;
+				},
+				hasPeerPhone(agentNumber) {
+					const phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+					return phone !== '' && phone !== '-' && phone !== '—';
+				},
+				getPeerPhoneLabel(agentNumber) {
+					const phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+					return this.hasPeerPhone(agentNumber) ? phone : '—';
+				},
+				getPeerNameLabel(agentNumber) {
+					// Placeholder for future "peer name" feature
+					void agentNumber;
+					return '—';
 				}
 			},
 			data: {

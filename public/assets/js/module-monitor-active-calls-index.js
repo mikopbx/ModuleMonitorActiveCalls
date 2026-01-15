@@ -61,6 +61,7 @@ var ModuleMonitorActiveCalls = {
       delimiters: ["<%", "%>"],
       methods: {
         updatedCallsFromResponse: function updatedCallsFromResponse(data) {
+          var _this = this;
           var queueNameEl = $(window[className].queueNameSelector);
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
           this.queues = data.queues;
@@ -87,9 +88,110 @@ var ModuleMonitorActiveCalls = {
               window[className].isInit = false;
             }
           }
+
+          // Normalize Semantic UI Card typography after render
+          this.$nextTick(function () {
+            _this.normalizeAgentCards();
+          });
         },
         formatElapsedTime: function formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
+        },
+        normalizeAgentCards: function normalizeAgentCards() {
+          if (!this.$el) return;
+
+          // Cleanup artifacts from previous experiments (placeholders/spacers).
+          var artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
+          artifacts.forEach(function (el) {
+            return el.remove();
+          });
+
+          // Masonry-like layout via CSS columns to avoid empty gaps with different card heights.
+          // We inject styles here because this project restricts edits to /public/assets/js/src/.
+          this.ensureAgentCardsMasonry();
+
+          // Prevent "equal height" cards in one row (Semantic UI cards are flex).
+          var cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
+          if (cardsContainer) {
+            cardsContainer.style.alignItems = 'flex-start';
+            cardsContainer.style.alignContent = 'flex-start';
+          }
+          var cards = this.$el.querySelectorAll('.ui.cards.agent-cards > .ui.card.agent-card');
+          cards.forEach(function (card) {
+            card.style.alignSelf = 'flex-start';
+          });
+
+          // Semantic UI makes .header bigger than normal text; we need same font size.
+          var headers = this.$el.querySelectorAll('.ui.card.agent-card .header.agent-card-header');
+          headers.forEach(function (el) {
+            el.style.fontSize = '1em';
+            el.style.lineHeight = '1.2';
+          });
+          var metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
+          metas.forEach(function (el) {
+            el.style.fontSize = '1em';
+            el.style.lineHeight = '1.2';
+          });
+
+          // Normalize label/name typography so they have same text height.
+          var numLabels = this.$el.querySelectorAll('.ui.card.agent-card .agent-num-label');
+          numLabels.forEach(function (el) {
+            el.style.fontSize = '1em';
+            el.style.lineHeight = '1.2';
+            el.style.display = 'inline-flex';
+            el.style.alignItems = 'center';
+            el.style.paddingTop = '0';
+            el.style.paddingBottom = '0';
+          });
+          var names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
+          names.forEach(function (el) {
+            el.style.lineHeight = '1.2';
+            el.style.display = 'inline-flex';
+            el.style.alignItems = 'center';
+          });
+
+          // Tune vertical gap between cards so that:
+          // 2 * (shortCardHeight + gap) ~= (tallCardHeight + gap)
+          // This makes the masonry columns visually "grid-like".
+          this.adjustAgentCardsGap();
+        },
+        adjustAgentCardsGap: function adjustAgentCardsGap() {
+          if (!this.$el) return;
+          var container = this.$el.querySelector('.ui.cards.agent-cards');
+          if (!container) return;
+          var cards = Array.from(container.querySelectorAll('.ui.card.agent-card'));
+          if (!cards.length) return;
+          var tallCard = cards.find(function (c) {
+            return c.querySelector('.meta.agent-peer');
+          });
+          var shortCard = cards.find(function (c) {
+            return !c.querySelector('.meta.agent-peer');
+          });
+          if (!tallCard || !shortCard) return;
+          var ht = tallCard.getBoundingClientRect().height;
+          var hs = shortCard.getBoundingClientRect().height;
+          if (!ht || !hs) return;
+
+          // From 2*(hs+g) = ht+g => g = ht - 2*hs
+          var gap = ht - 2 * hs;
+          if (!Number.isFinite(gap)) return;
+
+          // Clamp to sane range; negative means "no extra gap needed".
+          gap = Math.max(0, Math.min(20, Math.round(gap)));
+          container.style.setProperty('--agent-card-gap', "".concat(gap, "px"));
+        },
+        ensureAgentCardsMasonry: function ensureAgentCardsMasonry() {
+          var styleId = 'agent-cards-masonry-style';
+          if (!document.getElementById(styleId)) {
+            var styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            styleEl.textContent = "\n/* Masonry layout for agents cards (scoped) */\n.ui.cards.agent-cards.agent-cards-masonry {\n  display: block !important;\n  column-width: 240px;\n  column-gap: 1em;\n  /* Prevent overlap with the legend block below */\n  margin-bottom: 1em !important;\n  padding-bottom: 0.5em !important;\n}\n.ui.cards.agent-cards.agent-cards-masonry > .ui.card.agent-card {\n  display: inline-block !important;\n  width: 100% !important;\n  margin: 0 0 var(--agent-card-gap, 12px) 0 !important;\n  break-inside: avoid;\n  -webkit-column-break-inside: avoid;\n  page-break-inside: avoid;\n}\n\t\t\t\t\t\t".trim();
+            document.head.appendChild(styleEl);
+          }
+          var cardsContainer = this.$el && this.$el.querySelector ? this.$el.querySelector('.ui.cards.agent-cards') : null;
+          if (cardsContainer) {
+            cardsContainer.classList.add('agent-cards-masonry');
+          }
         },
         getSrcNumForAgent: function getSrcNumForAgent(agentNumber) {
           var result = '-';
@@ -173,6 +275,19 @@ var ModuleMonitorActiveCalls = {
             }
           }
           return result;
+        },
+        hasPeerPhone: function hasPeerPhone(agentNumber) {
+          var phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+          return phone !== '' && phone !== '-' && phone !== '—';
+        },
+        getPeerPhoneLabel: function getPeerPhoneLabel(agentNumber) {
+          var phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+          return this.hasPeerPhone(agentNumber) ? phone : '—';
+        },
+        getPeerNameLabel: function getPeerNameLabel(agentNumber) {
+          // Placeholder for future "peer name" feature
+          void agentNumber;
+          return '—';
         }
       },
       data: {
