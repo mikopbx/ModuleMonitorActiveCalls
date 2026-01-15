@@ -1,6 +1,10 @@
 "use strict";
 
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i["return"]) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
+function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
+function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
 function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
@@ -32,12 +36,14 @@ var inputClassName = 'mikopbx-module-input';
 /* global $, globalRootUrl, globalTranslate, Form, Config, Vue, Extensions */
 var ModuleMonitorActiveCalls = {
   isInit: true,
+  contactsCacheTtlMs: 120 * 60 * 1000,
   queueNameSelector: '#app-queue div.scrolling.dropdown',
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
   $dropDowns: $('#' + idForm + ' .ui.dropdown'),
   activeChannelsUrl: globalRootUrl + idUrl + "/getActiveChannels",
   activeChannelsUrlV2: globalRootUrl + idUrl + "/getActiveChannelsV2",
+  backendEnableUrl: globalRootUrl + idUrl + "/backandEnable",
   executeCallUrl: globalRootUrl + idUrl + "/executeCall",
   saveUserActionUrl: globalRootUrl + idUrl + "/saveUser",
   $widget: undefined,
@@ -50,6 +56,8 @@ var ModuleMonitorActiveCalls = {
    * On page load we init some Semantic UI library
    */
   initialize: function initialize() {
+    this.initContactsCache();
+    this.requestBackendEnable();
     $("#nowUser.dropdown.enable").dropdown({
       onChange: function onChange(value, text, $choice) {
         window[className].onChangeSetting('adminUserId', value);
@@ -121,6 +129,35 @@ var ModuleMonitorActiveCalls = {
             }
           }
           return available.concat(unavailable);
+        },
+        normalizePhone10: function normalizePhone10(phone) {
+          var digits = String(phone || '').replace(/\D+/g, '');
+          if (digits.length <= 10) return digits;
+          return digits.slice(-10);
+        },
+        updateContactFromWs: function updateContactFromWs(contact) {
+          var phone10 = this.normalizePhone10(contact === null || contact === void 0 ? void 0 : contact.number);
+          if (!phone10) return;
+          var client = String((contact === null || contact === void 0 ? void 0 : contact.client) || '').trim();
+          if (!client) return;
+          // Vue2: ensure reactivity for new keys
+          if (this.$set) {
+            this.$set(this.contactsByPhone10, phone10, client);
+          } else {
+            this.contactsByPhone10[phone10] = client;
+          }
+        },
+        getClientNameByPhone: function getClientNameByPhone(phone) {
+          var phone10 = this.normalizePhone10(phone);
+          return this.contactsByPhone10[phone10] || '';
+        },
+        getClientHeader: function getClientHeader(phone) {
+          var client = this.getClientNameByPhone(phone);
+          if (!client) return phone;
+          return "".concat(client, " <").concat(phone, ">");
+        },
+        hasClientByPhone: function hasClientByPhone(phone) {
+          return !!this.getClientNameByPhone(phone);
         },
         formatElapsedTime: function formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
@@ -422,9 +459,10 @@ var ModuleMonitorActiveCalls = {
           return this.hasPeerPhone(agentNumber) ? phone : '—';
         },
         getPeerNameLabel: function getPeerNameLabel(agentNumber) {
-          // Placeholder for future "peer name" feature
-          void agentNumber;
-          return '—';
+          // Use cached contacts (WS + IndexedDB) to show client name for peer phone.
+          var phone = this.getPeerPhoneLabel(agentNumber);
+          var client = this.getClientNameByPhone(phone);
+          return client || '—';
         }
       },
       data: {
@@ -434,9 +472,11 @@ var ModuleMonitorActiveCalls = {
         "queues": [],
         "agents": {},
         "agentsList": [],
+        "contactsByPhone10": {},
         "calls": []
       }
     });
+    window[className].applyContactsCacheToQueueWidget();
     window[className].$callsWidget = new Vue({
       el: '#calls',
       delimiters: ["<%", "%>"],
@@ -497,6 +537,13 @@ var ModuleMonitorActiveCalls = {
         },
         formatElapsedTime: function formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
+        },
+        getClientHeader: function getClientHeader(phone) {
+          var q = window[className].$widgetQueues;
+          if (q && typeof q.getClientHeader === 'function') {
+            return q.getClientHeader(phone);
+          }
+          return phone;
         },
         hangupAction: function hangupAction(event) {
           var target = $(event.target);
@@ -650,6 +697,336 @@ var ModuleMonitorActiveCalls = {
     //////
     window[className].updateLines();
     setInterval(window[className].updateLines, 2000);
+  },
+  initContactsCache: function initContactsCache() {
+    var _this4 = this;
+    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
+      var _t;
+      return _regenerator().w(function (_context) {
+        while (1) switch (_context.p = _context.n) {
+          case 0:
+            _context.p = 0;
+            _context.n = 1;
+            return _this4.idbLoadAllContacts();
+          case 1:
+            _this4._contactsCacheByPhone10 = _context.v;
+            _this4.applyContactsCacheToQueueWidget();
+            _context.n = 3;
+            break;
+          case 2:
+            _context.p = 2;
+            _t = _context.v;
+            console.log('contacts cache init error', _t);
+            _this4._contactsCacheByPhone10 = {};
+          case 3:
+            return _context.a(2);
+        }
+      }, _callee, null, [[0, 2]]);
+    }))();
+  },
+  applyContactsCacheToQueueWidget: function applyContactsCacheToQueueWidget() {
+    if (!this._contactsCacheByPhone10) return;
+    if (!window[className].$widgetQueues) return;
+    for (var _i2 = 0, _Object$entries = Object.entries(this._contactsCacheByPhone10); _i2 < _Object$entries.length; _i2++) {
+      var _Object$entries$_i = _slicedToArray(_Object$entries[_i2], 2),
+        phone10 = _Object$entries$_i[0],
+        client = _Object$entries$_i[1];
+      if (window[className].$widgetQueues.$set) {
+        window[className].$widgetQueues.$set(window[className].$widgetQueues.contactsByPhone10, phone10, client);
+      } else {
+        window[className].$widgetQueues.contactsByPhone10[phone10] = client;
+      }
+    }
+  },
+  idbOpenContactsDb: function idbOpenContactsDb() {
+    return new Promise(function (resolve, reject) {
+      try {
+        var req = indexedDB.open('ModuleMonitorActiveCalls', 1);
+        req.onupgradeneeded = function () {
+          var db = req.result;
+          if (!db.objectStoreNames.contains('contactsByPhone10')) {
+            db.createObjectStore('contactsByPhone10', {
+              keyPath: 'phone10'
+            });
+          }
+        };
+        req.onsuccess = function () {
+          return resolve(req.result);
+        };
+        req.onerror = function () {
+          return reject(req.error);
+        };
+      } catch (e) {
+        reject(e);
+      }
+    });
+  },
+  idbPutContact: function idbPutContact(phone10, client) {
+    var _this5 = this;
+    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2() {
+      var db;
+      return _regenerator().w(function (_context2) {
+        while (1) switch (_context2.n) {
+          case 0:
+            _context2.n = 1;
+            return _this5.idbOpenContactsDb();
+          case 1:
+            db = _context2.v;
+            return _context2.a(2, new Promise(function (resolve, reject) {
+              var tx = db.transaction('contactsByPhone10', 'readwrite');
+              var store = tx.objectStore('contactsByPhone10');
+              store.put({
+                phone10: phone10,
+                client: client,
+                updatedAt: Date.now()
+              });
+              tx.oncomplete = function () {
+                db.close();
+                resolve();
+              };
+              tx.onerror = function () {
+                var err = tx.error;
+                db.close();
+                reject(err);
+              };
+            }));
+        }
+      }, _callee2);
+    }))();
+  },
+  idbLoadAllContacts: function idbLoadAllContacts() {
+    var _this6 = this;
+    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
+      var db;
+      return _regenerator().w(function (_context3) {
+        while (1) switch (_context3.n) {
+          case 0:
+            _context3.n = 1;
+            return _this6.idbOpenContactsDb();
+          case 1:
+            db = _context3.v;
+            return _context3.a(2, new Promise(function (resolve, reject) {
+              var tx = db.transaction('contactsByPhone10', 'readwrite');
+              var store = tx.objectStore('contactsByPhone10');
+              var req = store.getAll();
+              req.onsuccess = function () {
+                var map = {};
+                var now = Date.now();
+                var ttlMs = Number(_this6.contactsCacheTtlMs) || 120 * 60 * 1000;
+                var _iterator2 = _createForOfIteratorHelper(req.result || []),
+                  _step2;
+                try {
+                  for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
+                    var row = _step2.value;
+                    var phone10 = row === null || row === void 0 ? void 0 : row.phone10;
+                    var client = row === null || row === void 0 ? void 0 : row.client;
+                    var updatedAt = Number(row === null || row === void 0 ? void 0 : row.updatedAt) || 0;
+                    var isFresh = phone10 && client && updatedAt > 0 && now - updatedAt <= ttlMs;
+                    if (isFresh) {
+                      map[phone10] = client;
+                    } else if (phone10) {
+                      // Cleanup expired/broken records
+                      try {
+                        store["delete"](phone10);
+                      } catch (e) {/* ignore */}
+                    }
+                  }
+                } catch (err) {
+                  _iterator2.e(err);
+                } finally {
+                  _iterator2.f();
+                }
+                tx.oncomplete = function () {
+                  db.close();
+                  resolve(map);
+                };
+                tx.onerror = function () {
+                  var err = tx.error;
+                  db.close();
+                  reject(err);
+                };
+              };
+              req.onerror = function () {
+                var err = req.error;
+                db.close();
+                reject(err);
+              };
+            }));
+        }
+      }, _callee3);
+    }))();
+  },
+  requestBackendEnable: function requestBackendEnable() {
+    $.api({
+      url: window[className].backendEnableUrl,
+      on: 'now',
+      method: 'POST',
+      onSuccess: function onSuccess(response) {
+        var _response$data, _response$data2;
+        console.log('backandEnable response', response);
+        var accessToken = response === null || response === void 0 || (_response$data = response.data) === null || _response$data === void 0 ? void 0 : _response$data.access_token;
+        var refreshToken = response === null || response === void 0 || (_response$data2 = response.data) === null || _response$data2 === void 0 ? void 0 : _response$data2.refresh_token;
+        if (accessToken && refreshToken) {
+          window[className].setAuthTokens(accessToken, refreshToken);
+          window[className].connectContactsWs();
+        }
+      },
+      onFailure: function onFailure(response) {
+        console.log('backandEnable failure', response);
+      },
+      onError: function onError(errorMessage, element, xhr) {
+        console.log('backandEnable error', errorMessage, xhr);
+      }
+    });
+  },
+  setAuthTokens: function setAuthTokens(accessToken, refreshToken) {
+    this._authTokens = this._authTokens || {};
+    this._authTokens.access_token = accessToken;
+    this._authTokens.refresh_token = refreshToken;
+    this._authTokens.exp = this.getJwtExp(accessToken);
+  },
+  getJwtExp: function getJwtExp(token) {
+    try {
+      if (!token || typeof token !== 'string') return 0;
+      var parts = token.split('.');
+      if (parts.length < 2) return 0;
+      var payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      var padded = payloadB64 + '='.repeat((4 - payloadB64.length % 4) % 4);
+      var json = atob(padded);
+      var payload = JSON.parse(json);
+      return Number(payload === null || payload === void 0 ? void 0 : payload.exp) || 0;
+    } catch (e) {
+      return 0;
+    }
+  },
+  isAccessTokenExpired: function isAccessTokenExpired() {
+    var _this$_authTokens;
+    var skewSeconds = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+    var exp = Number((_this$_authTokens = this._authTokens) === null || _this$_authTokens === void 0 ? void 0 : _this$_authTokens.exp) || 0;
+    if (!exp) return false; // unknown exp -> don't force refresh
+    var now = Math.floor(Date.now() / 1000);
+    return now + skewSeconds >= exp;
+  },
+  scheduleContactsWsTokenRefresh: function scheduleContactsWsTokenRefresh() {
+    var _this$_authTokens2,
+      _this7 = this;
+    // Proactively refresh token shortly before expiry by re-requesting backendEnable.
+    if (this._contactsWsTokenTimer) {
+      clearTimeout(this._contactsWsTokenTimer);
+      this._contactsWsTokenTimer = null;
+    }
+    var exp = Number((_this$_authTokens2 = this._authTokens) === null || _this$_authTokens2 === void 0 ? void 0 : _this$_authTokens2.exp) || 0;
+    if (!exp) return;
+    var now = Math.floor(Date.now() / 1000);
+    var refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
+    this._contactsWsTokenTimer = setTimeout(function () {
+      // Re-get tokens and reconnect WS
+      _this7.requestBackendEnable();
+    }, refreshInSec * 1000);
+  },
+  scheduleContactsWsReconnect: function scheduleContactsWsReconnect(reason) {
+    var _this8 = this;
+    var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+    if (this._contactsWsReconnectTimer) {
+      clearTimeout(this._contactsWsReconnectTimer);
+      this._contactsWsReconnectTimer = null;
+    }
+    this._contactsWsReconnectAttempt = (this._contactsWsReconnectAttempt || 0) + 1;
+    var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
+    this._contactsWsReconnectTimer = setTimeout(function () {
+      if (forceReAuth || _this8.isAccessTokenExpired(5)) {
+        _this8.requestBackendEnable();
+      } else {
+        _this8.connectContactsWs();
+      }
+    }, delay);
+    console.log('contacts ws reconnect scheduled', {
+      reason: reason,
+      delayMs: delay
+    });
+  },
+  connectContactsWs: function connectContactsWs() {
+    var _this9 = this;
+    try {
+      var _this$_authTokens3;
+      var accessToken = (_this$_authTokens3 = this._authTokens) === null || _this$_authTokens3 === void 0 ? void 0 : _this$_authTokens3.access_token;
+      if (!accessToken) return;
+
+      // Avoid reconnecting if already connected/connecting
+      if (this._contactsWs && (this._contactsWs.readyState === WebSocket.OPEN || this._contactsWs.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
+      // Reset backoff on explicit connect attempt
+      this._contactsWsReconnectAttempt = 0;
+      var wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      var wsHost = window.location.host; // host:port of current page
+      var tokenParam = encodeURIComponent(accessToken);
+      var wsUrl = "".concat(wsProto, "://").concat(wsHost, "/pbxcore/api/module-softphone-backend/v1/sub/contacts?authorization=").concat(tokenParam);
+      this._contactsWs = new WebSocket(wsUrl);
+      this._contactsWs.onopen = function () {
+        console.log('contacts ws connected');
+        _this9.scheduleContactsWsTokenRefresh();
+      };
+      this._contactsWs.onmessage = function (event) {
+        _this9.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+      };
+      this._contactsWs.onerror = function (event) {
+        console.log('contacts ws error', event);
+      };
+      this._contactsWs.onclose = function (event) {
+        var code = event === null || event === void 0 ? void 0 : event.code;
+        var reason = event === null || event === void 0 ? void 0 : event.reason;
+        console.log('contacts ws closed', {
+          code: code,
+          reason: reason
+        });
+        if (_this9._contactsWsTokenTimer) {
+          clearTimeout(_this9._contactsWsTokenTimer);
+          _this9._contactsWsTokenTimer = null;
+        }
+
+        // 1000 = normal close -> reconnect; auth closes vary by server implementation.
+        var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
+        var forceReAuth = authCloseCodes.has(code) || _this9.isAccessTokenExpired(0);
+        _this9.scheduleContactsWsReconnect('close', forceReAuth);
+      };
+    } catch (e) {
+      console.log('contacts ws init error', e);
+      this.scheduleContactsWsReconnect('init_error', this.isAccessTokenExpired(0));
+    }
+  },
+  handleContactsWsMessage: function handleContactsWsMessage(data) {
+    try {
+      if (!data) return;
+      var parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      var items = Array.isArray(parsed) ? parsed : [parsed];
+      var _iterator3 = _createForOfIteratorHelper(items),
+        _step3;
+      try {
+        for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
+          var item = _step3.value;
+          var digits = String((item === null || item === void 0 ? void 0 : item.number) || '').replace(/\D+/g, '');
+          var phone10 = digits.length <= 10 ? digits : digits.slice(-10);
+          var client = String((item === null || item === void 0 ? void 0 : item.client) || '').trim();
+          if (phone10 && client) {
+            this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
+            this._contactsCacheByPhone10[phone10] = client;
+            this.idbPutContact(phone10, client)["catch"](function (e) {
+              return console.log('contacts cache save error', e);
+            });
+          }
+          if (window[className].$widgetQueues) {
+            window[className].$widgetQueues.updateContactFromWs(item);
+          }
+        }
+      } catch (err) {
+        _iterator3.e(err);
+      } finally {
+        _iterator3.f();
+      }
+    } catch (e) {
+      console.log('contacts ws parse error', e);
+    }
   },
   formatElapsedTime: function formatElapsedTime(enterTime) {
     if (!enterTime) return '—';

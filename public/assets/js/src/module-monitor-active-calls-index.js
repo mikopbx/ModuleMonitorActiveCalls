@@ -13,12 +13,14 @@ const inputClassName = 'mikopbx-module-input';
 /* global $, globalRootUrl, globalTranslate, Form, Config, Vue, Extensions */
 const ModuleMonitorActiveCalls = {
 	isInit: true,
+	contactsCacheTtlMs: 120 * 60 * 1000,
 	queueNameSelector: '#app-queue div.scrolling.dropdown',
 	$formObj: $('#'+idForm),
 	$checkBoxes: $('#'+idForm+' .ui.checkbox'),
 	$dropDowns: $('#'+idForm+' .ui.dropdown'),
 	activeChannelsUrl: globalRootUrl + idUrl + "/getActiveChannels",
 	activeChannelsUrlV2: globalRootUrl + idUrl + "/getActiveChannelsV2",
+	backendEnableUrl: globalRootUrl + idUrl + "/backandEnable",
 	executeCallUrl: globalRootUrl + idUrl + "/executeCall",
 	saveUserActionUrl: globalRootUrl + idUrl + "/saveUser",
 	$widget: undefined,
@@ -32,6 +34,9 @@ const ModuleMonitorActiveCalls = {
 	 * On page load we init some Semantic UI library
 	 */
 	initialize() {
+		this.initContactsCache();
+		this.requestBackendEnable();
+
 		$("#nowUser.dropdown.enable").dropdown({
 			onChange: function onChange(value, text, $choice) {
 				window[className].onChangeSetting('adminUserId', value);
@@ -99,6 +104,35 @@ const ModuleMonitorActiveCalls = {
 						}
 					}
 					return available.concat(unavailable);
+				},
+				normalizePhone10(phone) {
+					const digits = String(phone || '').replace(/\D+/g, '');
+					if (digits.length <= 10) return digits;
+					return digits.slice(-10);
+				},
+				updateContactFromWs(contact) {
+					const phone10 = this.normalizePhone10(contact?.number);
+					if (!phone10) return;
+					const client = String(contact?.client || '').trim();
+					if (!client) return;
+					// Vue2: ensure reactivity for new keys
+					if (this.$set) {
+						this.$set(this.contactsByPhone10, phone10, client);
+					} else {
+						this.contactsByPhone10[phone10] = client;
+					}
+				},
+				getClientNameByPhone(phone) {
+					const phone10 = this.normalizePhone10(phone);
+					return this.contactsByPhone10[phone10] || '';
+				},
+				getClientHeader(phone) {
+					const client = this.getClientNameByPhone(phone);
+					if (!client) return phone;
+					return `${client} <${phone}>`;
+				},
+				hasClientByPhone(phone) {
+					return !!this.getClientNameByPhone(phone);
 				},
 				formatElapsedTime(enterTime) {
 					return window[className].formatElapsedTime(enterTime);
@@ -397,9 +431,10 @@ const ModuleMonitorActiveCalls = {
 					return this.hasPeerPhone(agentNumber) ? phone : '—';
 				},
 				getPeerNameLabel(agentNumber) {
-					// Placeholder for future "peer name" feature
-					void agentNumber;
-					return '—';
+					// Use cached contacts (WS + IndexedDB) to show client name for peer phone.
+					const phone = this.getPeerPhoneLabel(agentNumber);
+					const client = this.getClientNameByPhone(phone);
+					return client || '—';
 				}
 			},
 			data: {
@@ -410,10 +445,12 @@ const ModuleMonitorActiveCalls = {
 				"agents": {
 				},
 				"agentsList": [],
+				"contactsByPhone10": {},
 				"calls": [
 				]
 			},
 		});
+		window[className].applyContactsCacheToQueueWidget();
 
 		window[className].$callsWidget = new Vue({
 			el: '#calls',
@@ -478,6 +515,13 @@ const ModuleMonitorActiveCalls = {
 				},
 				formatElapsedTime(enterTime) {
 					return window[className].formatElapsedTime(enterTime);
+				},
+				getClientHeader(phone) {
+					const q = window[className].$widgetQueues;
+					if (q && typeof q.getClientHeader === 'function') {
+						return q.getClientHeader(phone);
+					}
+					return phone;
 				},
 				hangupAction(event) {
 					let target = $(event.target);
@@ -595,6 +639,230 @@ const ModuleMonitorActiveCalls = {
 		//////
 		window[className].updateLines();
 		setInterval(window[className].updateLines, 2000);
+	},
+	async initContactsCache() {
+		try {
+			this._contactsCacheByPhone10 = await this.idbLoadAllContacts();
+			this.applyContactsCacheToQueueWidget();
+		} catch (e) {
+			console.log('contacts cache init error', e);
+			this._contactsCacheByPhone10 = {};
+		}
+	},
+	applyContactsCacheToQueueWidget() {
+		if (!this._contactsCacheByPhone10) return;
+		if (!window[className].$widgetQueues) return;
+		for (const [phone10, client] of Object.entries(this._contactsCacheByPhone10)) {
+			if (window[className].$widgetQueues.$set) {
+				window[className].$widgetQueues.$set(window[className].$widgetQueues.contactsByPhone10, phone10, client);
+			} else {
+				window[className].$widgetQueues.contactsByPhone10[phone10] = client;
+			}
+		}
+	},
+	idbOpenContactsDb() {
+		return new Promise((resolve, reject) => {
+			try {
+				const req = indexedDB.open('ModuleMonitorActiveCalls', 1);
+				req.onupgradeneeded = () => {
+					const db = req.result;
+					if (!db.objectStoreNames.contains('contactsByPhone10')) {
+						db.createObjectStore('contactsByPhone10', { keyPath: 'phone10' });
+					}
+				};
+				req.onsuccess = () => resolve(req.result);
+				req.onerror = () => reject(req.error);
+			} catch (e) {
+				reject(e);
+			}
+		});
+	},
+	async idbPutContact(phone10, client) {
+		const db = await this.idbOpenContactsDb();
+		return new Promise((resolve, reject) => {
+			const tx = db.transaction('contactsByPhone10', 'readwrite');
+			const store = tx.objectStore('contactsByPhone10');
+			store.put({ phone10, client, updatedAt: Date.now() });
+			tx.oncomplete = () => { db.close(); resolve(); };
+			tx.onerror = () => { const err = tx.error; db.close(); reject(err); };
+		});
+	},
+	async idbLoadAllContacts() {
+		const db = await this.idbOpenContactsDb();
+		return new Promise((resolve, reject) => {
+			const tx = db.transaction('contactsByPhone10', 'readwrite');
+			const store = tx.objectStore('contactsByPhone10');
+			const req = store.getAll();
+			req.onsuccess = () => {
+				const map = {};
+				const now = Date.now();
+				const ttlMs = Number(this.contactsCacheTtlMs) || (120 * 60 * 1000);
+				for (const row of req.result || []) {
+					const phone10 = row?.phone10;
+					const client = row?.client;
+					const updatedAt = Number(row?.updatedAt) || 0;
+					const isFresh = phone10 && client && updatedAt > 0 && (now - updatedAt) <= ttlMs;
+					if (isFresh) {
+						map[phone10] = client;
+					} else if (phone10) {
+						// Cleanup expired/broken records
+						try { store.delete(phone10); } catch (e) { /* ignore */ }
+					}
+				}
+				tx.oncomplete = () => { db.close(); resolve(map); };
+				tx.onerror = () => { const err = tx.error; db.close(); reject(err); };
+			};
+			req.onerror = () => { const err = req.error; db.close(); reject(err); };
+		});
+	},
+	requestBackendEnable() {
+		$.api({
+			url: window[className].backendEnableUrl,
+			on: 'now',
+			method: 'POST',
+			onSuccess(response) {
+				console.log('backandEnable response', response);
+				const accessToken = response?.data?.access_token;
+				const refreshToken = response?.data?.refresh_token;
+				if (accessToken && refreshToken) {
+					window[className].setAuthTokens(accessToken, refreshToken);
+					window[className].connectContactsWs();
+				}
+			},
+			onFailure(response) {
+				console.log('backandEnable failure', response);
+			},
+			onError(errorMessage, element, xhr) {
+				console.log('backandEnable error', errorMessage, xhr);
+			}
+		});
+	},
+	setAuthTokens(accessToken, refreshToken) {
+		this._authTokens = this._authTokens || {};
+		this._authTokens.access_token = accessToken;
+		this._authTokens.refresh_token = refreshToken;
+		this._authTokens.exp = this.getJwtExp(accessToken);
+	},
+	getJwtExp(token) {
+		try {
+			if (!token || typeof token !== 'string') return 0;
+			const parts = token.split('.');
+			if (parts.length < 2) return 0;
+			const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+			const padded = payloadB64 + '='.repeat((4 - (payloadB64.length % 4)) % 4);
+			const json = atob(padded);
+			const payload = JSON.parse(json);
+			return Number(payload?.exp) || 0;
+		} catch (e) {
+			return 0;
+		}
+	},
+	isAccessTokenExpired(skewSeconds = 0) {
+		const exp = Number(this._authTokens?.exp) || 0;
+		if (!exp) return false; // unknown exp -> don't force refresh
+		const now = Math.floor(Date.now() / 1000);
+		return now + skewSeconds >= exp;
+	},
+	scheduleContactsWsTokenRefresh() {
+		// Proactively refresh token shortly before expiry by re-requesting backendEnable.
+		if (this._contactsWsTokenTimer) {
+			clearTimeout(this._contactsWsTokenTimer);
+			this._contactsWsTokenTimer = null;
+		}
+		const exp = Number(this._authTokens?.exp) || 0;
+		if (!exp) return;
+		const now = Math.floor(Date.now() / 1000);
+		const refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
+		this._contactsWsTokenTimer = setTimeout(() => {
+			// Re-get tokens and reconnect WS
+			this.requestBackendEnable();
+		}, refreshInSec * 1000);
+	},
+	scheduleContactsWsReconnect(reason, forceReAuth = false) {
+		if (this._contactsWsReconnectTimer) {
+			clearTimeout(this._contactsWsReconnectTimer);
+			this._contactsWsReconnectTimer = null;
+		}
+		this._contactsWsReconnectAttempt = (this._contactsWsReconnectAttempt || 0) + 1;
+		const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
+		this._contactsWsReconnectTimer = setTimeout(() => {
+			if (forceReAuth || this.isAccessTokenExpired(5)) {
+				this.requestBackendEnable();
+			} else {
+				this.connectContactsWs();
+			}
+		}, delay);
+		console.log('contacts ws reconnect scheduled', { reason, delayMs: delay });
+	},
+	connectContactsWs() {
+		try {
+			const accessToken = this._authTokens?.access_token;
+			if (!accessToken) return;
+
+			// Avoid reconnecting if already connected/connecting
+			if (this._contactsWs && (this._contactsWs.readyState === WebSocket.OPEN || this._contactsWs.readyState === WebSocket.CONNECTING)) {
+				return;
+			}
+			// Reset backoff on explicit connect attempt
+			this._contactsWsReconnectAttempt = 0;
+
+			const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+			const wsHost = window.location.host; // host:port of current page
+			const tokenParam = encodeURIComponent(accessToken);
+			const wsUrl = `${wsProto}://${wsHost}/pbxcore/api/module-softphone-backend/v1/sub/contacts?authorization=${tokenParam}`;
+
+			this._contactsWs = new WebSocket(wsUrl);
+			this._contactsWs.onopen = () => {
+				console.log('contacts ws connected');
+				this.scheduleContactsWsTokenRefresh();
+			};
+			this._contactsWs.onmessage = (event) => {
+				this.handleContactsWsMessage(event?.data);
+			};
+			this._contactsWs.onerror = (event) => {
+				console.log('contacts ws error', event);
+			};
+			this._contactsWs.onclose = (event) => {
+				const code = event?.code;
+				const reason = event?.reason;
+				console.log('contacts ws closed', { code, reason });
+
+				if (this._contactsWsTokenTimer) {
+					clearTimeout(this._contactsWsTokenTimer);
+					this._contactsWsTokenTimer = null;
+				}
+
+				// 1000 = normal close -> reconnect; auth closes vary by server implementation.
+				const authCloseCodes = new Set([1008, 4001, 4401, 4403]);
+				const forceReAuth = authCloseCodes.has(code) || this.isAccessTokenExpired(0);
+				this.scheduleContactsWsReconnect('close', forceReAuth);
+			};
+		} catch (e) {
+			console.log('contacts ws init error', e);
+			this.scheduleContactsWsReconnect('init_error', this.isAccessTokenExpired(0));
+		}
+	},
+	handleContactsWsMessage(data) {
+		try {
+			if (!data) return;
+			const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+			const items = Array.isArray(parsed) ? parsed : [parsed];
+			for (const item of items) {
+				const digits = String(item?.number || '').replace(/\D+/g, '');
+				const phone10 = digits.length <= 10 ? digits : digits.slice(-10);
+				const client = String(item?.client || '').trim();
+				if (phone10 && client) {
+					this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
+					this._contactsCacheByPhone10[phone10] = client;
+					this.idbPutContact(phone10, client).catch((e) => console.log('contacts cache save error', e));
+				}
+				if (window[className].$widgetQueues) {
+					window[className].$widgetQueues.updateContactFromWs(item);
+				}
+			}
+		} catch (e) {
+			console.log('contacts ws parse error', e);
+		}
 	},
 	formatElapsedTime(enterTime) {
 		if (!enterTime) return '—';

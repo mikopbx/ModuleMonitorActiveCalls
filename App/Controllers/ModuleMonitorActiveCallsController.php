@@ -9,7 +9,7 @@ namespace Modules\ModuleMonitorActiveCalls\App\Controllers;
 use MikoPBX\AdminCabinet\Controllers\BaseController;
 use MikoPBX\AdminCabinet\Controllers\SessionController;
 use MikoPBX\Common\Models\Extensions;
-use MikoPBX\Common\Models\Users;
+use MikoPBX\Common\Models\PbxExtensionModules;
 use MikoPBX\Common\Providers\PBXConfModulesProvider;
 use MikoPBX\Common\Providers\SessionProvider;
 use MikoPBX\Modules\Config\CDRConfigInterface;
@@ -22,7 +22,7 @@ use Modules\ModuleMonitorActiveCalls\Models\UsersSettings;
 use Modules\ModuleUsersUI\Lib\Constants;
 use Modules\ModuleUsersUI\Models\AccessGroups;
 use Modules\ModuleUsersUI\Models\UsersCredentials;
-use DateTime;
+use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController as ModuleSoftphoneBackendApi;
 
 class ModuleMonitorActiveCallsController extends BaseController
 {
@@ -145,6 +145,21 @@ class ModuleMonitorActiveCallsController extends BaseController
         $this->flash->success($this->translation->_('ms_SuccessfulSaved'));
         $this->view->success = true;
         $this->view->data = $data;
+    }
+
+    public function backandEnableAction() :void
+    {
+        $result = PbxExtensionModules::findFirstByUniqid("ModuleSoftphoneBackend");
+        if ($result !== null && intval($result->disabled ) === 0) {
+            // Модуль включен.
+            $api = new ModuleSoftphoneBackendApi();
+            $api->initialize();
+            $this->view->data = $api->createLoginResponse('1', 'admin');
+            $this->view->success = true;
+        }else{
+            $this->view->success = false;
+            $this->view->data = [];
+        }
     }
 
     public function saveUserAction():void
