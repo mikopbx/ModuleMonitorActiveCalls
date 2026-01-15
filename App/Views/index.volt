@@ -66,7 +66,7 @@
 <br>
 <div id="app-queue" class="ui">
     <div class="ui stackable two column grid">
-        <div class="six wide column">
+        <div class="four wide column">
             <div class="ui top attached segment">
                 <h4 class="ui header">
                     <i class="headphones icon" aria-hidden="true"></i>
@@ -97,12 +97,12 @@
             </div>
         </div>
 
-        <div class="ten wide column">
+        <div class="twelve wide column">
             <div class="ui segment">
                 <div class="ui cards agent-cards">
                     <div
-                        v-for="(agent, number) in agents"
-                        :key="number"
+                        v-for="agent in agentsList"
+                        :key="agent.number"
                         class="ui card agent-card"
                         :class="{
                             'row-available': agent.state === 'Idle',
@@ -122,19 +122,19 @@
                                         'grey': agent.state === 'Unavailable'
                                     }"
                                 >
-                                    <% number %>
+                                    <% agent.number %>
                                 </span>
                                 <span class="agent-name"><% agent.name %></span>
                             </div>
 
-                            <div class="meta agent-peer" v-if="hasPeerPhone(number)">
+                            <div class="meta agent-peer" v-if="hasPeerPhone(agent.number)">
                                 <div class="peer-line">
                                     <i class="phone icon" aria-hidden="true"></i>
-                                    <span class="agent-phone"><% getPeerPhoneLabel(number) %></span>
+                                    <span class="agent-phone"><% getPeerPhoneLabel(agent.number) %></span>
                                 </div>
                                 <div class="peer-line peer-name">
                                     <i class="user outline icon" aria-hidden="true"></i>
-                                    <span><% getPeerNameLabel(number) %></span>
+                                    <span><% getPeerNameLabel(agent.number) %></span>
                                 </div>
                             </div>
                         </div>

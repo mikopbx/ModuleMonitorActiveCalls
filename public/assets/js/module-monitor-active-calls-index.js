@@ -1,16 +1,22 @@
 "use strict";
 
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
 function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
-function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 /*
  * Copyright (C) MIKO LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
@@ -71,10 +77,12 @@ var ModuleMonitorActiveCalls = {
             this.name = data.queues[queueId].name;
             this.number = data.queues[queueId].number;
             this.agents = data.queues[queueId].agents;
+            this.agentsList = this.buildAgentsList(this.agents);
             this.calls = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
             this.allCalls = data.calls;
           } else {
             this.calls = [];
+            this.agentsList = [];
           }
           if (queueNameEl.dropdown('is hidden')) {
             queueNameEl.dropdown({
@@ -94,10 +102,31 @@ var ModuleMonitorActiveCalls = {
             _this.normalizeAgentCards();
           });
         },
+        buildAgentsList: function buildAgentsList(agentsObj) {
+          var entries = Object.entries(agentsObj || {});
+          var available = [];
+          var unavailable = [];
+          for (var _i = 0, _entries = entries; _i < _entries.length; _i++) {
+            var _entries$_i = _slicedToArray(_entries[_i], 2),
+              number = _entries$_i[0],
+              agent = _entries$_i[1];
+            var state = (agent === null || agent === void 0 ? void 0 : agent.state) || '';
+            var item = _objectSpread({
+              number: number
+            }, agent);
+            if (state === 'Unavailable') {
+              unavailable.push(item);
+            } else {
+              available.push(item);
+            }
+          }
+          return available.concat(unavailable);
+        },
         formatElapsedTime: function formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
         },
         normalizeAgentCards: function normalizeAgentCards() {
+          var _this2 = this;
           if (!this.$el) return;
 
           // Cleanup artifacts from previous experiments (placeholders/spacers).
@@ -106,9 +135,9 @@ var ModuleMonitorActiveCalls = {
             return el.remove();
           });
 
-          // Masonry-like layout via CSS columns to avoid empty gaps with different card heights.
-          // We inject styles here because this project restricts edits to /public/assets/js/src/.
-          this.ensureAgentCardsMasonry();
+          // Dense layout (masonry) that still fills left-to-right:
+          // flex-wrap can't place items into vertical gaps under tall cards.
+          this.ensureAgentCardsGridMasonry();
 
           // Prevent "equal height" cards in one row (Semantic UI cards are flex).
           var cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
@@ -126,6 +155,10 @@ var ModuleMonitorActiveCalls = {
           headers.forEach(function (el) {
             el.style.fontSize = '1em';
             el.style.lineHeight = '1.2';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.gap = '0.5em';
+            el.style.whiteSpace = 'nowrap';
           });
           var metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
           metas.forEach(function (el) {
@@ -142,18 +175,31 @@ var ModuleMonitorActiveCalls = {
             el.style.alignItems = 'center';
             el.style.paddingTop = '0';
             el.style.paddingBottom = '0';
+            // Allow label to shrink (otherwise long numbers force card wider than 180px)
+            el.style.flex = '0 1 auto';
+            el.style.minWidth = '0';
+            el.style.maxWidth = '14ch';
+            el.style.overflow = 'hidden';
+            el.style.textOverflow = 'ellipsis';
+            el.style.whiteSpace = 'nowrap';
           });
           var names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
           names.forEach(function (el) {
             el.style.lineHeight = '1.2';
-            el.style.display = 'inline-flex';
-            el.style.alignItems = 'center';
+            // Ellipsis for long names (e.g. "Салтыков-Щедрин")
+            el.style.minWidth = '0';
+            el.style.flex = '1 1 auto';
+            el.style.overflow = 'hidden';
+            el.style.textOverflow = 'ellipsis';
+            el.style.whiteSpace = 'nowrap';
           });
 
-          // Tune vertical gap between cards so that:
-          // 2 * (shortCardHeight + gap) ~= (tallCardHeight + gap)
-          // This makes the masonry columns visually "grid-like".
-          this.adjustAgentCardsGap();
+          // Grid masonry needs row-span calculation after layout.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              _this2.layoutAgentCardsGridMasonry();
+            });
+          });
         },
         adjustAgentCardsGap: function adjustAgentCardsGap() {
           if (!this.$el) return;
@@ -180,18 +226,109 @@ var ModuleMonitorActiveCalls = {
           gap = Math.max(0, Math.min(20, Math.round(gap)));
           container.style.setProperty('--agent-card-gap', "".concat(gap, "px"));
         },
-        ensureAgentCardsMasonry: function ensureAgentCardsMasonry() {
-          var styleId = 'agent-cards-masonry-style';
-          if (!document.getElementById(styleId)) {
-            var styleEl = document.createElement('style');
+        adjustAgentCardsColumnCount: function adjustAgentCardsColumnCount() {
+          if (!this.$el) return;
+          var container = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-masonry');
+          if (!container) return;
+          var w = container.clientWidth;
+          if (!w) return;
+
+          // Minimum acceptable card width in px (tune if needed)
+          var minCardWidth = 150;
+          var cs = window.getComputedStyle(container);
+          var gapRaw = cs.columnGap || cs.getPropertyValue('column-gap') || '16px';
+          var gapPx = parseFloat(gapRaw) || 16;
+          var count = Math.max(1, Math.min(12, Math.floor((w + gapPx) / (minCardWidth + gapPx))));
+          container.style.setProperty('--agent-card-col-count', String(count));
+        },
+        ensureAgentCardsGridMasonry: function ensureAgentCardsGridMasonry() {
+          var _this3 = this;
+          var styleId = 'agent-cards-layout-style';
+          var styleEl = document.getElementById(styleId);
+          if (!styleEl) {
+            styleEl = document.createElement('style');
             styleEl.id = styleId;
-            styleEl.textContent = "\n/* Masonry layout for agents cards (scoped) */\n.ui.cards.agent-cards.agent-cards-masonry {\n  display: block !important;\n  column-width: 240px;\n  column-gap: 1em;\n  /* Prevent overlap with the legend block below */\n  margin-bottom: 1em !important;\n  padding-bottom: 0.5em !important;\n}\n.ui.cards.agent-cards.agent-cards-masonry > .ui.card.agent-card {\n  display: inline-block !important;\n  width: 100% !important;\n  margin: 0 0 var(--agent-card-gap, 12px) 0 !important;\n  break-inside: avoid;\n  -webkit-column-break-inside: avoid;\n  page-break-inside: avoid;\n}\n\t\t\t\t\t\t".trim();
             document.head.appendChild(styleEl);
           }
+
+          // Grid masonry: fills left-to-right and can pack items into gaps.
+          styleEl.textContent = "\n.ui.cards.agent-cards.agent-cards-grid {\n  display: grid !important;\n  grid-template-columns: repeat(auto-fill, 240px);\n  justify-content: start;\n  gap: var(--agent-card-gap, 8px);\n  grid-auto-rows: 1px;\n  /* Prevent overlap with the legend block below */\n  margin-bottom: 1em !important;\n}\n.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {\n  width: 240px !important;\n  margin: 0 !important;\n  overflow: hidden;\n  /* reset from previous layouts */\n  align-self: start;\n}\n\t\t\t\t\t".trim();
           var cardsContainer = this.$el && this.$el.querySelector ? this.$el.querySelector('.ui.cards.agent-cards') : null;
           if (cardsContainer) {
-            cardsContainer.classList.add('agent-cards-masonry');
+            cardsContainer.classList.remove('agent-cards-masonry');
+            cardsContainer.classList.remove('agent-cards-flex');
+            cardsContainer.classList.add('agent-cards-grid');
+
+            // Bind once: relayout on resize.
+            if (!this._agentCardsResizeBound) {
+              this._agentCardsResizeBound = true;
+              window.addEventListener('resize', function () {
+                _this3.layoutAgentCardsGridMasonry();
+              });
+            }
           }
+        },
+        layoutAgentCardsGridMasonry: function layoutAgentCardsGridMasonry() {
+          if (!this.$el) return;
+          var grid = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-grid');
+          if (!grid) return;
+          var cs = window.getComputedStyle(grid);
+          var rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
+          var rowGap = parseFloat(cs.getPropertyValue('row-gap')) || parseFloat(cs.getPropertyValue('gap')) || 8;
+          var items = Array.from(grid.querySelectorAll('.ui.card.agent-card'));
+          if (!items.length) return;
+
+          // Reset row spans and min-heights to measure natural heights.
+          items.forEach(function (item) {
+            item.style.gridRowEnd = '';
+            item.style.minHeight = '';
+          });
+          var tall = items.filter(function (c) {
+            return c.querySelector('.meta.agent-peer');
+          });
+          var _short = items.filter(function (c) {
+            return !c.querySelector('.meta.agent-peer');
+          });
+
+          // If we don't have both types, just do normal masonry spans.
+          if (!tall.length || !_short.length) {
+            items.forEach(function (item) {
+              var h = item.getBoundingClientRect().height;
+              var span = Math.max(1, Math.ceil((h + rowGap) / (rowHeight + rowGap)));
+              item.style.gridRowEnd = "span ".concat(span);
+            });
+            return;
+          }
+          var hs = Math.max.apply(Math, _toConsumableArray(_short.map(function (c) {
+            return c.getBoundingClientRect().height;
+          })));
+          var ht = Math.max.apply(Math, _toConsumableArray(tall.map(function (c) {
+            return c.getBoundingClientRect().height;
+          })));
+
+          // Want: 2*(hs + g) = (ht + g)  => g = ht - 2*hs
+          var g = ht - 2 * hs;
+          if (!Number.isFinite(g)) g = rowGap;
+          g = Math.max(0, Math.min(24, Math.round(g)));
+
+          // Apply gap and enforce min-heights so the relation holds visually.
+          grid.style.setProperty('--agent-card-gap', "".concat(g, "px"));
+          var shortH = Math.round(hs);
+          var tallH = Math.round(Math.max(ht, 2 * hs + g));
+          _short.forEach(function (c) {
+            c.style.minHeight = "".concat(shortH, "px");
+          });
+          tall.forEach(function (c) {
+            c.style.minHeight = "".concat(tallH, "px");
+          });
+
+          // Now compute row spans from final rendered heights.
+          var effectiveGap = g;
+          items.forEach(function (item) {
+            var h = item.getBoundingClientRect().height;
+            var span = Math.max(1, Math.ceil((h + effectiveGap) / (rowHeight + effectiveGap)));
+            item.style.gridRowEnd = "span ".concat(span);
+          });
         },
         getSrcNumForAgent: function getSrcNumForAgent(agentNumber) {
           var result = '-';
@@ -296,6 +433,7 @@ var ModuleMonitorActiveCalls = {
         "number": "",
         "queues": [],
         "agents": {},
+        "agentsList": [],
         "calls": []
       }
     });

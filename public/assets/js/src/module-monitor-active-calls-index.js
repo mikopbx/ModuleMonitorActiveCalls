@@ -60,10 +60,12 @@ const ModuleMonitorActiveCalls = {
 						this.name   = data.queues[queueId].name;
 						this.number = data.queues[queueId].number;
 						this.agents = data.queues[queueId].agents;
+						this.agentsList = this.buildAgentsList(this.agents);
 						this.calls  = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
 						this.allCalls = data.calls;
 					}else{
 						this.calls  = [];
+						this.agentsList = [];
 					}
 					if(queueNameEl.dropdown('is hidden')){
 						queueNameEl.dropdown({
@@ -83,6 +85,21 @@ const ModuleMonitorActiveCalls = {
 						this.normalizeAgentCards();
 					});
 				},
+				buildAgentsList(agentsObj) {
+					const entries = Object.entries(agentsObj || {});
+					const available = [];
+					const unavailable = [];
+					for (const [number, agent] of entries) {
+						const state = agent?.state || '';
+						const item = { number, ...agent };
+						if (state === 'Unavailable') {
+							unavailable.push(item);
+						} else {
+							available.push(item);
+						}
+					}
+					return available.concat(unavailable);
+				},
 				formatElapsedTime(enterTime) {
 					return window[className].formatElapsedTime(enterTime);
 				},
@@ -93,9 +110,9 @@ const ModuleMonitorActiveCalls = {
 					const artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
 					artifacts.forEach((el) => el.remove());
 
-					// Masonry-like layout via CSS columns to avoid empty gaps with different card heights.
-					// We inject styles here because this project restricts edits to /public/assets/js/src/.
-					this.ensureAgentCardsMasonry();
+					// Dense layout (masonry) that still fills left-to-right:
+					// flex-wrap can't place items into vertical gaps under tall cards.
+					this.ensureAgentCardsGridMasonry();
 
 					// Prevent "equal height" cards in one row (Semantic UI cards are flex).
 					const cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
@@ -114,6 +131,10 @@ const ModuleMonitorActiveCalls = {
 					headers.forEach((el) => {
 						el.style.fontSize = '1em';
 						el.style.lineHeight = '1.2';
+						el.style.display = 'flex';
+						el.style.alignItems = 'center';
+						el.style.gap = '0.5em';
+						el.style.whiteSpace = 'nowrap';
 					});
 
 					const metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
@@ -131,18 +152,31 @@ const ModuleMonitorActiveCalls = {
 						el.style.alignItems = 'center';
 						el.style.paddingTop = '0';
 						el.style.paddingBottom = '0';
+						// Allow label to shrink (otherwise long numbers force card wider than 180px)
+						el.style.flex = '0 1 auto';
+						el.style.minWidth = '0';
+						el.style.maxWidth = '14ch';
+						el.style.overflow = 'hidden';
+						el.style.textOverflow = 'ellipsis';
+						el.style.whiteSpace = 'nowrap';
 					});
 					const names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
 					names.forEach((el) => {
 						el.style.lineHeight = '1.2';
-						el.style.display = 'inline-flex';
-						el.style.alignItems = 'center';
+						// Ellipsis for long names (e.g. "Салтыков-Щедрин")
+						el.style.minWidth = '0';
+						el.style.flex = '1 1 auto';
+						el.style.overflow = 'hidden';
+						el.style.textOverflow = 'ellipsis';
+						el.style.whiteSpace = 'nowrap';
 					});
 
-					// Tune vertical gap between cards so that:
-					// 2 * (shortCardHeight + gap) ~= (tallCardHeight + gap)
-					// This makes the masonry columns visually "grid-like".
-					this.adjustAgentCardsGap();
+					// Grid masonry needs row-span calculation after layout.
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							this.layoutAgentCardsGridMasonry();
+						});
+					});
 				},
 				adjustAgentCardsGap() {
 					if (!this.$el) return;
@@ -169,39 +203,124 @@ const ModuleMonitorActiveCalls = {
 
 					container.style.setProperty('--agent-card-gap', `${gap}px`);
 				},
-				ensureAgentCardsMasonry() {
-					const styleId = 'agent-cards-masonry-style';
-					if (!document.getElementById(styleId)) {
-						const styleEl = document.createElement('style');
+				adjustAgentCardsColumnCount() {
+					if (!this.$el) return;
+					const container = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-masonry');
+					if (!container) return;
+
+					const w = container.clientWidth;
+					if (!w) return;
+
+					// Minimum acceptable card width in px (tune if needed)
+					const minCardWidth = 150;
+
+					const cs = window.getComputedStyle(container);
+					const gapRaw = cs.columnGap || cs.getPropertyValue('column-gap') || '16px';
+					const gapPx = parseFloat(gapRaw) || 16;
+
+					const count = Math.max(1, Math.min(12, Math.floor((w + gapPx) / (minCardWidth + gapPx))));
+					container.style.setProperty('--agent-card-col-count', String(count));
+				},
+				ensureAgentCardsGridMasonry() {
+					const styleId = 'agent-cards-layout-style';
+					let styleEl = document.getElementById(styleId);
+					if (!styleEl) {
+						styleEl = document.createElement('style');
 						styleEl.id = styleId;
-						styleEl.textContent = `
-/* Masonry layout for agents cards (scoped) */
-.ui.cards.agent-cards.agent-cards-masonry {
-  display: block !important;
-  column-width: 240px;
-  column-gap: 1em;
-  /* Prevent overlap with the legend block below */
-  margin-bottom: 1em !important;
-  padding-bottom: 0.5em !important;
-}
-.ui.cards.agent-cards.agent-cards-masonry > .ui.card.agent-card {
-  display: inline-block !important;
-  width: 100% !important;
-  margin: 0 0 var(--agent-card-gap, 12px) 0 !important;
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-  page-break-inside: avoid;
-}
-						`.trim();
 						document.head.appendChild(styleEl);
 					}
+
+					// Grid masonry: fills left-to-right and can pack items into gaps.
+					styleEl.textContent = `
+.ui.cards.agent-cards.agent-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, 240px);
+  justify-content: start;
+  gap: var(--agent-card-gap, 8px);
+  grid-auto-rows: 1px;
+  /* Prevent overlap with the legend block below */
+  margin-bottom: 1em !important;
+}
+.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {
+  width: 240px !important;
+  margin: 0 !important;
+  overflow: hidden;
+  /* reset from previous layouts */
+  align-self: start;
+}
+					`.trim();
 
 					const cardsContainer = this.$el && this.$el.querySelector
 						? this.$el.querySelector('.ui.cards.agent-cards')
 						: null;
 					if (cardsContainer) {
-						cardsContainer.classList.add('agent-cards-masonry');
+						cardsContainer.classList.remove('agent-cards-masonry');
+						cardsContainer.classList.remove('agent-cards-flex');
+						cardsContainer.classList.add('agent-cards-grid');
+
+						// Bind once: relayout on resize.
+						if (!this._agentCardsResizeBound) {
+							this._agentCardsResizeBound = true;
+							window.addEventListener('resize', () => {
+								this.layoutAgentCardsGridMasonry();
+							});
+						}
 					}
+				},
+				layoutAgentCardsGridMasonry() {
+					if (!this.$el) return;
+					const grid = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-grid');
+					if (!grid) return;
+
+					const cs = window.getComputedStyle(grid);
+					const rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
+					const rowGap = parseFloat(cs.getPropertyValue('row-gap')) || parseFloat(cs.getPropertyValue('gap')) || 8;
+
+					const items = Array.from(grid.querySelectorAll('.ui.card.agent-card'));
+					if (!items.length) return;
+
+					// Reset row spans and min-heights to measure natural heights.
+					items.forEach((item) => {
+						item.style.gridRowEnd = '';
+						item.style.minHeight = '';
+					});
+
+					const tall = items.filter((c) => c.querySelector('.meta.agent-peer'));
+					const short = items.filter((c) => !c.querySelector('.meta.agent-peer'));
+
+					// If we don't have both types, just do normal masonry spans.
+					if (!tall.length || !short.length) {
+						items.forEach((item) => {
+							const h = item.getBoundingClientRect().height;
+							const span = Math.max(1, Math.ceil((h + rowGap) / (rowHeight + rowGap)));
+							item.style.gridRowEnd = `span ${span}`;
+						});
+						return;
+					}
+
+					const hs = Math.max(...short.map((c) => c.getBoundingClientRect().height));
+					const ht = Math.max(...tall.map((c) => c.getBoundingClientRect().height));
+
+					// Want: 2*(hs + g) = (ht + g)  => g = ht - 2*hs
+					let g = ht - 2 * hs;
+					if (!Number.isFinite(g)) g = rowGap;
+					g = Math.max(0, Math.min(24, Math.round(g)));
+
+					// Apply gap and enforce min-heights so the relation holds visually.
+					grid.style.setProperty('--agent-card-gap', `${g}px`);
+
+					const shortH = Math.round(hs);
+					const tallH = Math.round(Math.max(ht, 2 * hs + g));
+					short.forEach((c) => { c.style.minHeight = `${shortH}px`; });
+					tall.forEach((c) => { c.style.minHeight = `${tallH}px`; });
+
+					// Now compute row spans from final rendered heights.
+					const effectiveGap = g;
+					items.forEach((item) => {
+						const h = item.getBoundingClientRect().height;
+						const span = Math.max(1, Math.ceil((h + effectiveGap) / (rowHeight + effectiveGap)));
+						item.style.gridRowEnd = `span ${span}`;
+					});
 				},
 				getSrcNumForAgent(agentNumber) {
 					let result = '-';
@@ -290,6 +409,7 @@ const ModuleMonitorActiveCalls = {
 				"queues": [],
 				"agents": {
 				},
+				"agentsList": [],
 				"calls": [
 				]
 			},

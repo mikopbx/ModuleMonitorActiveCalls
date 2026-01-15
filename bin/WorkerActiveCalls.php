@@ -342,6 +342,25 @@ class WorkerActiveCalls extends WorkerBase
                 $queuesData[$call['lastQueue']]['calls'][] = $call;
             }
         }
+
+        // Move Unavailable agents to the end of the list (keep original order for the rest).
+        foreach ($queuesData as $qId => $queueTmpData) {
+            if (empty($queuesData[$qId]['agents']) || !is_array($queuesData[$qId]['agents'])) {
+                continue;
+            }
+            $availableAgents = [];
+            $unavailableAgents = [];
+            foreach ($queuesData[$qId]['agents'] as $agentNumber => $agentData) {
+                $state = $agentData['state'] ?? '';
+                if ($state === self::STATE_UNAVAILIBLE || $state === self::STATE_UNAVAILABLE) {
+                    $unavailableAgents[$agentNumber] = $agentData;
+                } else {
+                    $availableAgents[$agentNumber] = $agentData;
+                }
+            }
+            $queuesData[$qId]['agents'] = $availableAgents + $unavailableAgents;
+        }
+
         $dataPrint = json_encode(['queues' => $queuesData, 'calls' => $calls], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintHash){
@@ -370,7 +389,8 @@ class WorkerActiveCalls extends WorkerBase
     /**
      * Поиск связанного канала.
      * @param $linkedId
-     * @param $srcChan
+     * @param $dstChannel
+     * @param $tmpBridgeStart
      * @return bool
      */
     private function findBridgeChannel($linkedId, &$dstChannel, &$tmpBridgeStart):bool
@@ -383,7 +403,6 @@ class WorkerActiveCalls extends WorkerBase
         while ( ($dstChannel === $srcChan || stripos($dstChannel, 'Local/') !== false) && $chFound ) {
             $ch--;
             if($ch < 0){
-                print_r('ERROR, while');
                 break;
             }
             $chFound = false;
@@ -423,6 +442,7 @@ class WorkerActiveCalls extends WorkerBase
 
     private function collectQueuesInfo():void
     {
+        $this->logger->writeInfo('Update queues data...');
         $this->queuesData = [];
         $queues = CallQueues::find(['columns' => 'name,extension as number,uniqid as id']);
         foreach ($queues as $queue){
@@ -433,7 +453,6 @@ class WorkerActiveCalls extends WorkerBase
         foreach ($queuesAgents as $queuesAgent) {
             $this->queuesData[$queuesAgent->queue]['agents'][] = $queuesAgent->extension;
         }
-
         if(!$this->init){
             return;
         }
@@ -454,10 +473,8 @@ class WorkerActiveCalls extends WorkerBase
                 'Uniqueid'      => $queueCall['Uniqueid'],
                 'Linkedid'      => $linkedId
             ];
-
             $this->callType[$linkedId]['queue'] = $queueCall['Queue'];
         }
-
     }
 
     /**
