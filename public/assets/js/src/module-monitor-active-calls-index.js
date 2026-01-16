@@ -55,10 +55,14 @@ const ModuleMonitorActiveCalls = {
 			delimiters: ["<%","%>"],
 			methods: {
 				updatedCallsFromResponse(data) {
+					// Keep last payload to allow re-render on queue switch (WS mode).
+					this.lastActiveCallsPayload = data;
+
 					let queueNameEl = $(window[className].queueNameSelector);
 					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
 
 					this.queues = data.queues;
+					this.allCalls = data.calls;
 					let queueId = $('#queueId').val();
 					if (queueId in data.queues) {
 						this.id     = data.queues[queueId].id;
@@ -67,7 +71,6 @@ const ModuleMonitorActiveCalls = {
 						this.agents = data.queues[queueId].agents;
 						this.agentsList = this.buildAgentsList(this.agents);
 						this.calls  = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
-						this.allCalls = data.calls;
 					}else{
 						this.calls  = [];
 						this.agentsList = [];
@@ -89,6 +92,11 @@ const ModuleMonitorActiveCalls = {
 					this.$nextTick(() => {
 						this.normalizeAgentCards();
 					});
+				},
+				refreshFromLastPayload() {
+					if (this.lastActiveCallsPayload) {
+						this.updatedCallsFromResponse(this.lastActiveCallsPayload);
+					}
 				},
 				buildAgentsList(agentsObj) {
 					const entries = Object.entries(agentsObj || {});
@@ -445,6 +453,7 @@ const ModuleMonitorActiveCalls = {
 				"agents": {
 				},
 				"agentsList": [],
+				"lastActiveCallsPayload": null,
 				"contactsByPhone10": {},
 				"calls": [
 				]
@@ -991,6 +1000,10 @@ const ModuleMonitorActiveCalls = {
 			onSuccess(response) {
 				if(settingName === 'queueId'){
 					$('#queueId').val($(window[className].queueNameSelector).dropdown('get value'));
+					// Re-render queue widget from last received payload (WS mode)
+					if (window[className].$widgetQueues && typeof window[className].$widgetQueues.refreshFromLastPayload === 'function') {
+						window[className].$widgetQueues.refreshFromLastPayload();
+					}
 				}else if( settingName === 'adminUserId'){
 					window.location.href = window.location.href;
 				}

@@ -125,28 +125,56 @@ class WorkerActiveCalls extends WorkerBase
         return false;
     }
 
-    private function channelAdditionalControle()
+    /**
+     * Дополнительный контроль активных вызовов.
+     * @return void
+     */
+    private function channelAdditionalControl()
     {
         if(empty($this->activeChannels)){
             return;
         }
+        $this->logger->writeInfo('Start channelAdditionalControl...');
         try{
             $channelsData = WorkerAmiActions::invokeApi('getChannels', []);
-            if(!empty($channelsData)){
-                $ids = array_keys($channelsData);
-                $chanIds = array_keys($this->activeChannels);
-                foreach ($chanIds as $id){
-                    if(!in_array($id, $ids)){
-                        unset($this->activeChannels[$id]);
+            if (!is_array($channelsData) || empty($channelsData)) {
+                // Пустой массив может быть признаком некорректной работы $channelsData
+                // Не обрабатывает такой вариант.
+                return;
+            }
+
+            // Cleanup by linkedid and also prune stale channels inside existing linkedid.
+            foreach (array_keys($this->activeChannels) as $linkedId) {
+                if (!isset($channelsData[$linkedId]) || !is_array($channelsData[$linkedId])) {
+                    unset(
+                        $this->activeChannels[$linkedId],
+                        $this->callType[$linkedId],
+                        $this->activeBridges[$linkedId],
+                        $this->spyerChannels[$linkedId]
+                    );
+                    continue;
+                }
+
+                $actualChannels = array_flip($channelsData[$linkedId]);
+                foreach (array_keys($this->activeChannels[$linkedId]) as $channel) {
+                    if (!isset($actualChannels[$channel])) {
+                        unset($this->activeChannels[$linkedId][$channel]);
+                        $endpoint = self::getEndpointName($channel);
+                        unset($this->states[$endpoint]['channels'][$channel]);
                     }
                 }
+
+                if (empty($this->activeChannels[$linkedId])) {
+                    unset(
+                        $this->activeChannels[$linkedId],
+                        $this->callType[$linkedId],
+                        $this->activeBridges[$linkedId],
+                        $this->spyerChannels[$linkedId]
+                    );
+                }
             }
-        }catch (Throwable $e){
-            SystemMessages::sysLogMsg(
-                static::class,
-                "Channel contole: " . $e->getMessage(),
-                LOG_WARNING
-            );
+        }catch (\Throwable $e){
+            SystemMessages::sysLogMsg( static::class, "Channel control: " . $e->getMessage(), LOG_WARNING);
         }
     }
 
@@ -209,9 +237,9 @@ class WorkerActiveCalls extends WorkerBase
         if($this->init){
             return;
         }
-        if(time() - $this->lastControlActiveCalls > 60 && !empty($this->activeChannels)){
+        if(time() - $this->lastControlActiveCalls > 60){
             $this->lastControlActiveCalls = time();
-            $this->channelAdditionalControle();
+            $this->channelAdditionalControl();
         }
 
         $queuesData = $this->queuesData;
@@ -866,6 +894,9 @@ class WorkerActiveCalls extends WorkerBase
             $this->getExtensionsInfo();
             $this->collectQueuesInfo();
             $this->backendExists = MonitorActiveCallsMain::backendExists();
+            // Force periodic refresh/cleanup. Without this, stale calls may persist
+            // forever if we missed a Hangup event for any reason.
+            $this->printActiveCalls();
             return;
         }
         if($parameters['Event'] === 'ExtensionStatus'){

@@ -76,9 +76,12 @@ var ModuleMonitorActiveCalls = {
       methods: {
         updatedCallsFromResponse: function updatedCallsFromResponse(data) {
           var _this = this;
+          // Keep last payload to allow re-render on queue switch (WS mode).
+          this.lastActiveCallsPayload = data;
           var queueNameEl = $(window[className].queueNameSelector);
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
           this.queues = data.queues;
+          this.allCalls = data.calls;
           var queueId = $('#queueId').val();
           if (queueId in data.queues) {
             this.id = data.queues[queueId].id;
@@ -87,7 +90,6 @@ var ModuleMonitorActiveCalls = {
             this.agents = data.queues[queueId].agents;
             this.agentsList = this.buildAgentsList(this.agents);
             this.calls = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
-            this.allCalls = data.calls;
           } else {
             this.calls = [];
             this.agentsList = [];
@@ -109,6 +111,11 @@ var ModuleMonitorActiveCalls = {
           this.$nextTick(function () {
             _this.normalizeAgentCards();
           });
+        },
+        refreshFromLastPayload: function refreshFromLastPayload() {
+          if (this.lastActiveCallsPayload) {
+            this.updatedCallsFromResponse(this.lastActiveCallsPayload);
+          }
         },
         buildAgentsList: function buildAgentsList(agentsObj) {
           var entries = Object.entries(agentsObj || {});
@@ -472,6 +479,7 @@ var ModuleMonitorActiveCalls = {
         "queues": [],
         "agents": {},
         "agentsList": [],
+        "lastActiveCallsPayload": null,
         "contactsByPhone10": {},
         "calls": []
       }
@@ -1159,6 +1167,10 @@ var ModuleMonitorActiveCalls = {
       onSuccess: function onSuccess(response) {
         if (settingName === 'queueId') {
           $('#queueId').val($(window[className].queueNameSelector).dropdown('get value'));
+          // Re-render queue widget from last received payload (WS mode)
+          if (window[className].$widgetQueues && typeof window[className].$widgetQueues.refreshFromLastPayload === 'function') {
+            window[className].$widgetQueues.refreshFromLastPayload();
+          }
         } else if (settingName === 'adminUserId') {
           window.location.href = window.location.href;
         }
