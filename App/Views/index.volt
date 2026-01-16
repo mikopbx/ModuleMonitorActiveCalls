@@ -69,7 +69,7 @@
         <div class="four wide column">
             <div class="ui top attached segment">
                 <h4 class="ui header">
-                    <i class="headphones icon" aria-hidden="true"></i>
+                    <i class="users icon" aria-hidden="true"></i>
                     <div class="content">
                         <span class="ui blue text"></span>
                         <div class="ui scrolling dropdown">
@@ -84,10 +84,10 @@
                 </h4>
             </div>
             <div class="ui bottom attached segment">
-                <h4 class="ui dividing header"> {{ t._('module_monitorCalls_waitingClients') }} </h4>
+                <!-- <h4 class="ui dividing header"> {{ t._('module_monitorCalls_waitingClients') }} </h4> -->
                 <div class="ui relaxed divided list">
                     <div v-for="call in calls" v-if="call.dst_chan==='' && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
-                        <i class="small teal phone volume icon" aria-hidden="true"></i>
+                        <!-- <i class="small teal phone volume icon" aria-hidden="true"></i> -->
                         <div class="content">
                             <div class="header">
                                 <i v-if="hasClientByPhone(call.src_num)" class="address book outline icon" aria-hidden="true"></i>

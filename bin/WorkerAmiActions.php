@@ -130,6 +130,9 @@ class WorkerAmiActions extends WorkerBase
      */
     public function restAPICallback(array $request): PBXApiResult
     {
+        $this->amCustom->disconnect();
+        $this->amCustom = $this->getAstManager();
+
         $res    = new PBXApiResult();
         $res->processor = __METHOD__;
         $action = strtolower($request['action']);
@@ -174,6 +177,8 @@ class WorkerAmiActions extends WorkerBase
 
     public function getChannels()
     {
+        $this->amCustom->disconnect();
+        $this->amCustom = $this->getAstManager();
         return $this->amCustom->getChannels();
     }
 
