@@ -143,6 +143,8 @@ const ModuleMonitorActiveCalls = {
 					return !!this.getClientNameByPhone(phone);
 				},
 				formatElapsedTime(enterTime) {
+					// Make this method reactive to the UI ticker.
+					void this.nowTick;
 					return window[className].formatElapsedTime(enterTime);
 				},
 				normalizeAgentCards() {
@@ -447,6 +449,7 @@ const ModuleMonitorActiveCalls = {
 			},
 			data: {
 				"minWaitVisible": 30,
+				"nowTick": 0,
 				"name": "",
 				"number": "",
 				"queues": [],
@@ -466,6 +469,7 @@ const ModuleMonitorActiveCalls = {
 			delimiters: ["<%","%>"],
 			data: {
 				"minWaitVisible": 30,
+				"nowTick": 0,
 				userNumber: userNumber,
 				fullAccess: ($('#fullAccess').val() === "1" || userNumber === ''),
 				calls: [
@@ -473,6 +477,7 @@ const ModuleMonitorActiveCalls = {
 			},
 			methods: {
 				callIsVisible(call){
+					void this.nowTick;
 					if(call.dst_chan==='' && call.queueData.EnterTime !== undefined ){
 						return this.minWaitVisible <= this.getWaitTime(call);
 					}
@@ -494,6 +499,7 @@ const ModuleMonitorActiveCalls = {
 					return `${hours}:${minutes}:${seconds}`;
 				},
 				getWaitTime(call){
+					void this.nowTick;
 					let answer = Math.floor(Date.now() / 1000);
 					if(call.answer !== ''){
 						answer = call.answer
@@ -501,6 +507,7 @@ const ModuleMonitorActiveCalls = {
 					return window[className].secondToTime(answer - call.start);
 				},
 				getCallTime(call){
+					void this.nowTick;
 					if(call.answer === ''){
 						return '-';
 					}
@@ -639,6 +646,7 @@ const ModuleMonitorActiveCalls = {
 		window[className].$dropDowns.dropdown();
 		window[className].initializeForm();
 		$('.menu .item').tab();
+		window[className].startUiTicker();
 		//////
 		// Удаляем отступы контейнера.
 		$('#main-content-container').removeClass('container');
@@ -647,6 +655,18 @@ const ModuleMonitorActiveCalls = {
 		// Окончание форматирования базовой страницы
 		//////
 		this.startPollingActiveCalls();
+	},
+	startUiTicker() {
+		if (this._uiTicker) return;
+		this._uiTicker = setInterval(() => {
+			const now = Date.now();
+			if (window[className].$widgetQueues) {
+				window[className].$widgetQueues.nowTick = now;
+			}
+			if (window[className].$callsWidget) {
+				window[className].$callsWidget.nowTick = now;
+			}
+		}, 1000);
 	},
 	startPollingActiveCalls() {
 		if (this._activeCallsPollTimer) return;

@@ -167,6 +167,8 @@ var ModuleMonitorActiveCalls = {
           return !!this.getClientNameByPhone(phone);
         },
         formatElapsedTime: function formatElapsedTime(enterTime) {
+          // Make this method reactive to the UI ticker.
+          void this.nowTick;
           return window[className].formatElapsedTime(enterTime);
         },
         normalizeAgentCards: function normalizeAgentCards() {
@@ -474,6 +476,7 @@ var ModuleMonitorActiveCalls = {
       },
       data: {
         "minWaitVisible": 30,
+        "nowTick": 0,
         "name": "",
         "number": "",
         "queues": [],
@@ -490,12 +493,14 @@ var ModuleMonitorActiveCalls = {
       delimiters: ["<%", "%>"],
       data: {
         "minWaitVisible": 30,
+        "nowTick": 0,
         userNumber: userNumber,
         fullAccess: $('#fullAccess').val() === "1" || userNumber === '',
         calls: []
       },
       methods: {
         callIsVisible: function callIsVisible(call) {
+          void this.nowTick;
           if (call.dst_chan === '' && call.queueData.EnterTime !== undefined) {
             return this.minWaitVisible <= this.getWaitTime(call);
           }
@@ -514,6 +519,7 @@ var ModuleMonitorActiveCalls = {
           return "".concat(hours, ":").concat(minutes, ":").concat(seconds);
         },
         getWaitTime: function getWaitTime(call) {
+          void this.nowTick;
           var answer = Math.floor(Date.now() / 1000);
           if (call.answer !== '') {
             answer = call.answer;
@@ -521,6 +527,7 @@ var ModuleMonitorActiveCalls = {
           return window[className].secondToTime(answer - call.start);
         },
         getCallTime: function getCallTime(call) {
+          void this.nowTick;
           if (call.answer === '') {
             return '-';
           }
@@ -696,6 +703,7 @@ var ModuleMonitorActiveCalls = {
     window[className].$dropDowns.dropdown();
     window[className].initializeForm();
     $('.menu .item').tab();
+    window[className].startUiTicker();
     //////
     // Удаляем отступы контейнера.
     $('#main-content-container').removeClass('container');
@@ -704,6 +712,18 @@ var ModuleMonitorActiveCalls = {
     // Окончание форматирования базовой страницы
     //////
     this.startPollingActiveCalls();
+  },
+  startUiTicker: function startUiTicker() {
+    if (this._uiTicker) return;
+    this._uiTicker = setInterval(function () {
+      var now = Date.now();
+      if (window[className].$widgetQueues) {
+        window[className].$widgetQueues.nowTick = now;
+      }
+      if (window[className].$callsWidget) {
+        window[className].$callsWidget.nowTick = now;
+      }
+    }, 1000);
   },
   startPollingActiveCalls: function startPollingActiveCalls() {
     if (this._activeCallsPollTimer) return;
