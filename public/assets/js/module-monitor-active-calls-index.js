@@ -145,13 +145,13 @@ var ModuleMonitorActiveCalls = {
         updateContactFromWs: function updateContactFromWs(contact) {
           var phone10 = this.normalizePhone10(contact === null || contact === void 0 ? void 0 : contact.number);
           if (!phone10) return;
-          var client = String((contact === null || contact === void 0 ? void 0 : contact.client) || '').trim();
-          if (!client) return;
+          var displayName = String((contact === null || contact === void 0 ? void 0 : contact.client) || (contact === null || contact === void 0 ? void 0 : contact.contact) || '').trim();
+          if (!displayName) return;
           // Vue2: ensure reactivity for new keys
           if (this.$set) {
-            this.$set(this.contactsByPhone10, phone10, client);
+            this.$set(this.contactsByPhone10, phone10, displayName);
           } else {
-            this.contactsByPhone10[phone10] = client;
+            this.contactsByPhone10[phone10] = displayName;
           }
         },
         getClientNameByPhone: function getClientNameByPhone(phone) {
@@ -1116,16 +1116,21 @@ var ModuleMonitorActiveCalls = {
           var item = _step3.value;
           var digits = String((item === null || item === void 0 ? void 0 : item.number) || '').replace(/\D+/g, '');
           var phone10 = digits.length <= 10 ? digits : digits.slice(-10);
-          var client = String((item === null || item === void 0 ? void 0 : item.client) || '').trim();
-          if (phone10 && client) {
+          var displayName = String((item === null || item === void 0 ? void 0 : item.client) || (item === null || item === void 0 ? void 0 : item.contact) || '').trim();
+          if (phone10 && displayName) {
             this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
-            this._contactsCacheByPhone10[phone10] = client;
-            this.idbPutContact(phone10, client)["catch"](function (e) {
+            this._contactsCacheByPhone10[phone10] = displayName;
+            this.idbPutContact(phone10, displayName)["catch"](function (e) {
               return console.log('contacts cache save error', e);
             });
           }
           if (window[className].$widgetQueues) {
             window[className].$widgetQueues.updateContactFromWs(item);
+          }
+          // Calls table is a separate Vue instance and reads client name via $widgetQueues.
+          // Vue can't track cross-instance dependency, so force re-render on contact update.
+          if (window[className].$callsWidget && typeof window[className].$callsWidget.$forceUpdate === 'function') {
+            window[className].$callsWidget.$forceUpdate();
           }
         }
       } catch (err) {

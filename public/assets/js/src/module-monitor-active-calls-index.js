@@ -121,13 +121,13 @@ const ModuleMonitorActiveCalls = {
 				updateContactFromWs(contact) {
 					const phone10 = this.normalizePhone10(contact?.number);
 					if (!phone10) return;
-					const client = String(contact?.client || '').trim();
-					if (!client) return;
+					const displayName = String(contact?.client || contact?.contact || '').trim();
+					if (!displayName) return;
 					// Vue2: ensure reactivity for new keys
 					if (this.$set) {
-						this.$set(this.contactsByPhone10, phone10, client);
+						this.$set(this.contactsByPhone10, phone10, displayName);
 					} else {
-						this.contactsByPhone10[phone10] = client;
+						this.contactsByPhone10[phone10] = displayName;
 					}
 				},
 				getClientNameByPhone(phone) {
@@ -952,14 +952,19 @@ const ModuleMonitorActiveCalls = {
 			for (const item of items) {
 				const digits = String(item?.number || '').replace(/\D+/g, '');
 				const phone10 = digits.length <= 10 ? digits : digits.slice(-10);
-				const client = String(item?.client || '').trim();
-				if (phone10 && client) {
+				const displayName = String(item?.client || item?.contact || '').trim();
+				if (phone10 && displayName) {
 					this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
-					this._contactsCacheByPhone10[phone10] = client;
-					this.idbPutContact(phone10, client).catch((e) => console.log('contacts cache save error', e));
+					this._contactsCacheByPhone10[phone10] = displayName;
+					this.idbPutContact(phone10, displayName).catch((e) => console.log('contacts cache save error', e));
 				}
 				if (window[className].$widgetQueues) {
 					window[className].$widgetQueues.updateContactFromWs(item);
+				}
+				// Calls table is a separate Vue instance and reads client name via $widgetQueues.
+				// Vue can't track cross-instance dependency, so force re-render on contact update.
+				if (window[className].$callsWidget && typeof window[className].$callsWidget.$forceUpdate === 'function') {
+					window[className].$callsWidget.$forceUpdate();
 				}
 			}
 		} catch (e) {
