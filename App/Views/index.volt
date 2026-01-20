@@ -132,8 +132,7 @@
 
                             <div class="meta agent-peer" v-if="hasPeerPhone(agent.number)">
                                 <div class="peer-line">
-                                    <i class="phone icon" aria-hidden="true"></i>
-                                    <span class="agent-phone"><% getPeerPhoneLabel(agent.number) %></span>
+                                    <span class="agent-phone need-update"><% getPeerPhoneLabel(agent.number) %></span>
                                 </div>
                                 <div class="peer-line peer-name">
                                     <i class="address book outline icon" aria-hidden="true"></i>
