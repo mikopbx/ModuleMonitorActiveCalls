@@ -51,6 +51,7 @@ class WorkerActiveCalls extends WorkerBase
     private array $callType = [];
     private array $queuesData = [];
     private array $spyerChannels = [];
+    private array $agentToQueues = []; // agent number => [queueIds]
 
     public const ENDPOINT_TYPE_PEER = '1';
     public const ENDPOINT_TYPE_PROVIDER = '2';
@@ -58,7 +59,6 @@ class WorkerActiveCalls extends WorkerBase
     public const STATE_RINGING      = 'Ringing';
     public const STATE_ONHOLD       = 'OnHold';
     public const STATE_RING         = 'Ring';
-    public const STATE_UNAVAILIBLE  = 'Unavailable';
     public const CALL_EVENTS = [
         'UserEvent',
         'ExtensionStatus',
@@ -67,18 +67,17 @@ class WorkerActiveCalls extends WorkerBase
         'BridgeLeave',
         'ChanSpyStart',
         'ChanSpyStop',
-        'ExtensionStatus',
         'Hangup',
         'Newstate',
         'Newchannel',
     ];
 
     public const QUEUE_AGENT_STATES = [
-        '0' => self::STATE_UNAVAILIBLE, // AST_DEVICE_UNKNOWN
+        '0' => self::STATE_UNAVAILABLE, // AST_DEVICE_UNKNOWN
         '1' => self::STATE_IDLE, //AST_DEVICE_NOT_INUSE
         '2' => self::STATE_BUSY, //AST_DEVICE_INUSE
         '3' => self::STATE_BUSY, // AST_DEVICE_UNAVAILABLE
-        '4' => self::STATE_UNAVAILIBLE, // AST_DEVICE_INVALID
+        '4' => self::STATE_UNAVAILABLE, // AST_DEVICE_INVALID
         '6' => self::STATE_RINGING, // AST_DEVICE_RINGING
         '7' => self::STATE_ONHOLD, // AST_DEVICE_ONHOLD
     ];
@@ -97,7 +96,12 @@ class WorkerActiveCalls extends WorkerBase
         'QueueCallerLeave'
     ];
 
-    private $queueEntryes = [];
+    private const CACHE_TTL = 80000;
+    private const CONTROL_INTERVAL = 60;
+    private const MAX_BRIDGE_ITERATIONS = 200;
+    private const AMI_REQUEST_TIMEOUT = 200000;
+
+    private array $queueEntryes = [];
 
     /**
      * Replies to a ping request from the worker
@@ -173,6 +177,33 @@ class WorkerActiveCalls extends WorkerBase
                     );
                 }
             }
+
+            // Cleanup queueEntryes for linkedIds that no longer exist
+            foreach ($this->queueEntryes as $queueId => $queueChannels) {
+                foreach ($queueChannels as $channel => $data) {
+                    $queueLinkedId = $data['Linkedid'] ?? '';
+                    if (!empty($queueLinkedId) && !isset($channelsData[$queueLinkedId])) {
+                        unset($this->queueEntryes[$queueId][$channel]);
+                    }
+                }
+                if (empty($this->queueEntryes[$queueId])) {
+                    unset($this->queueEntryes[$queueId]);
+                }
+            }
+
+            // Cleanup orphaned spyerChannels
+            foreach (array_keys($this->spyerChannels) as $spyLinkedId) {
+                if (!isset($channelsData[$spyLinkedId])) {
+                    unset($this->spyerChannels[$spyLinkedId]);
+                }
+            }
+
+            // Cleanup orphaned activeBridges
+            foreach (array_keys($this->activeBridges) as $bridgeLinkedId) {
+                if (!isset($channelsData[$bridgeLinkedId])) {
+                    unset($this->activeBridges[$bridgeLinkedId]);
+                }
+            }
         }catch (\Throwable $e){
             SystemMessages::sysLogMsg( static::class, "Channel control: " . $e->getMessage(), LOG_WARNING);
         }
@@ -201,10 +232,16 @@ class WorkerActiveCalls extends WorkerBase
         $this->printActiveCalls();
         $this->logger->writeInfo('Wait events...');
         while (true) {
-            $this->amCustom->waitUserEvent(true);
-            if (!$this->amCustom->loggedIn()) {
-                sleep(1);
-                $this->logger->writeInfo('initManagerAsterisk...');
+            try {
+                $this->amCustom->waitUserEvent(true);
+                if (!$this->amCustom->loggedIn()) {
+                    sleep(1);
+                    $this->logger->writeInfo('initManagerAsterisk...');
+                    $this->initManagerAsterisk();
+                }
+            } catch (\Throwable $e) {
+                $this->logger->writeError("Error in main loop: " . $e->getMessage());
+                sleep(2);
                 $this->initManagerAsterisk();
             }
         }
@@ -237,7 +274,7 @@ class WorkerActiveCalls extends WorkerBase
         if($this->init){
             return;
         }
-        if(time() - $this->lastControlActiveCalls > 60){
+        if(time() - $this->lastControlActiveCalls > self::CONTROL_INTERVAL){
             $this->lastControlActiveCalls = time();
             $this->channelAdditionalControl();
         }
@@ -306,14 +343,8 @@ class WorkerActiveCalls extends WorkerBase
                 $call['dst_num']  = $callData[$dstChannel]['CallerIDNum'];
 
                 // Обновляем статус агента очереди
-                foreach ($queuesData as $qId => $queueTmpData) {
-                    if(isset($queuesData[$qId]['agents'][$call['dst_num']])){
-                        $queuesData[$qId]['agents'][$call['dst_num']]['state'] = self::STATE_UP;
-                    }
-                    if(isset($queuesData[$qId]['agents'][$call['src_num']])){
-                        $queuesData[$qId]['agents'][$call['src_num']]['state'] = self::STATE_UP;
-                    }
-                }
+                $this->updateAgentState($queuesData, $call['dst_num'], self::STATE_UP);
+                $this->updateAgentState($queuesData, $call['src_num'], self::STATE_UP);
             }else{
                 $bridgeChannels = [];
                 // Поиск вызываемых каналов.
@@ -345,14 +376,8 @@ class WorkerActiveCalls extends WorkerBase
                             'dst_num'  => $tmpDstNum
                         ];
                         // Обновляем статус агента очереди
-                        foreach ($queuesData as $qId => $queueTmpData) {
-                            if(isset($queuesData[$qId]['agents'][$tmpSrcNum])){
-                                $queuesData[$qId]['agents'][$tmpSrcNum]['state'] = self::STATE_UP;
-                            }
-                            if(isset($queuesData[$qId]['agents'][$tmpDstNum])){
-                                $queuesData[$qId]['agents'][$tmpDstNum]['state'] = self::STATE_UP;
-                            }
-                        }
+                        $this->updateAgentState($queuesData, $tmpSrcNum, self::STATE_UP);
+                        $this->updateAgentState($queuesData, $tmpDstNum, self::STATE_UP);
                     }
 
                 }
@@ -384,7 +409,7 @@ class WorkerActiveCalls extends WorkerBase
             $unavailableAgents = [];
             foreach ($queuesData[$qId]['agents'] as $agentNumber => $agentData) {
                 $state = $agentData['state'] ?? '';
-                if ($state === self::STATE_UNAVAILIBLE || $state === self::STATE_UNAVAILABLE) {
+                if ($state === self::STATE_UNAVAILABLE) {
                     $unavailableAgents[$agentNumber] = $agentData;
                 } else {
                     $availableAgents[$agentNumber] = $agentData;
@@ -398,24 +423,74 @@ class WorkerActiveCalls extends WorkerBase
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintHash){
             $this->lastPrintHash = $newPrintHash;
-            CacheManager::setCacheData('getActiveChannelsV2Action', $callData, 80000);
+            CacheManager::setCacheData('getActiveChannelsV2Action', $callData, self::CACHE_TTL);
             if($this->backendExists) {
                 BackendApiController::publishActiveCalls($callData);
             }
         }
         unset($callData);
 
-        $data = ['states' => $this->states];
+        $enrichedStates = $this->enrichStatesWithConnections();
+        $data = ['states' => $enrichedStates];
         $dataPrint = json_encode($data, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintUserHash){
             $this->lastPrintUserHash = $newPrintHash;
-            CacheManager::setCacheData('getUsersStates', $data, 80000);
+            CacheManager::setCacheData('getUsersStates', $data, self::CACHE_TTL);
             if($this->backendExists){
                 BackendApiController::publishUserStates($data);
             }
         }
 
+    }
+
+    /**
+     * Обогащает states информацией о соединённых каналах.
+     * Создаёт копию $this->states, не модифицируя оригинал.
+     *
+     * @return array Enriched states with connection info
+     */
+    private function enrichStatesWithConnections(): array
+    {
+        $states = $this->states;
+
+        // Строим карту channel -> [linkedId, connectedChannel, connectedNumber]
+        $channelConnections = [];
+        foreach ($this->activeBridges as $linkedId => $bridges) {
+            foreach ($bridges as $bridgeChannels) {
+                $channelList = array_keys($bridgeChannels);
+                if (count($channelList) !== 2) {
+                    continue;
+                }
+                $ch1 = $channelList[0];
+                $ch2 = $channelList[1];
+                $num1 = $this->activeChannels[$linkedId][$ch1]['CallerIDNum'] ?? '';
+                $num2 = $this->activeChannels[$linkedId][$ch2]['CallerIDNum'] ?? '';
+
+                $channelConnections[$ch1] = ['channel' => $ch2, 'number' => $num2];
+                $channelConnections[$ch2] = ['channel' => $ch1, 'number' => $num1];
+            }
+        }
+
+        // Обновляем channels в копии states
+        foreach ($states as $endpoint => &$stateData) {
+            if (empty($stateData['channels'])) {
+                continue;
+            }
+            $enrichedChannels = [];
+            foreach (array_keys($stateData['channels']) as $channel) {
+                if (isset($channelConnections[$channel])) {
+                    $enrichedChannels[$channel] = $channelConnections[$channel];
+                } else {
+                    // Канал не в бридже (звонит/ожидает)
+                    $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                }
+            }
+            $stateData['channels'] = $enrichedChannels;
+        }
+        unset($stateData);
+
+        return $states;
     }
 
     /**
@@ -430,7 +505,7 @@ class WorkerActiveCalls extends WorkerBase
         $srcChan = $dstChannel;
         $chFound = true;
 
-        $ch = 200;
+        $ch = self::MAX_BRIDGE_ITERATIONS;
         // Поиск связанного канала.
         while ( ($dstChannel === $srcChan || stripos($dstChannel, 'Local/') !== false) && $chFound ) {
             $ch--;
@@ -472,6 +547,35 @@ class WorkerActiveCalls extends WorkerBase
         );
     }
 
+    /**
+     * Builds agent to queues index for O(1) lookup.
+     */
+    private function buildAgentIndex(): void
+    {
+        $this->agentToQueues = [];
+        foreach ($this->queuesData as $qId => $data) {
+            foreach ($data['agents'] as $agent) {
+                $this->agentToQueues[$agent][] = $qId;
+            }
+        }
+    }
+
+    /**
+     * Updates agent state in all queues where agent is a member.
+     *
+     * @param array $queuesData Reference to queues data array
+     * @param string $number Agent number
+     * @param string $state New state value
+     */
+    private function updateAgentState(array &$queuesData, string $number, string $state): void
+    {
+        foreach ($this->agentToQueues[$number] ?? [] as $qId) {
+            if (isset($queuesData[$qId]['agents'][$number])) {
+                $queuesData[$qId]['agents'][$number]['state'] = $state;
+            }
+        }
+    }
+
     private function collectQueuesInfo():void
     {
         $this->logger->writeInfo('Update queues data...');
@@ -485,6 +589,7 @@ class WorkerActiveCalls extends WorkerBase
         foreach ($queuesAgents as $queuesAgent) {
             $this->queuesData[$queuesAgent->queue]['agents'][] = $queuesAgent->extension;
         }
+        $this->buildAgentIndex();
         if(!$this->init){
             return;
         }
@@ -493,7 +598,7 @@ class WorkerActiveCalls extends WorkerBase
         $queueMember = $queueInfo['data']['QueueMember']??[];
         foreach ($queueMember as $member){
             if(isset($this->mobileStates[$member['Name']])){
-                $this->mobileStates[$member['Name']]['state'] = self::QUEUE_AGENT_STATES[$member['Status']]??self::STATE_UNAVAILIBLE;
+                $this->mobileStates[$member['Name']]['state'] = self::QUEUE_AGENT_STATES[$member['Status']]??self::STATE_UNAVAILABLE;
             }
         }
 
@@ -523,7 +628,7 @@ class WorkerActiveCalls extends WorkerBase
                 }
                 $endpoint   = self::getEndpointName($channel);
                 $context    = $this->amCustom->GetVar($channel, 'CONTEXT', '', false);
-                if(str_starts_with($context, 'ivr-')){
+                if(strpos($context, 'ivr-') === 0){
                     $extension = str_replace('ivr-', '', $context);
                     $inApp = true;
                 }else{
@@ -606,7 +711,7 @@ class WorkerActiveCalls extends WorkerBase
     public function getPjSipPeers(): array
     {
         $peers  = [];
-        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints', [], 200000);
+        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints', [], self::AMI_REQUEST_TIMEOUT);
         $state_array = [
             'Not in use' => self::STATE_IDLE,
             'Busy'       => self::STATE_UP,
@@ -731,9 +836,17 @@ class WorkerActiveCalls extends WorkerBase
      */
     public function callEvents($parameters):void
     {
-        if('Hangup' === $parameters['Event']){
-            $linkedId = $parameters['Linkedid'];
-            $channel  = $parameters['Channel'];
+        $event = $parameters['Event'] ?? '';
+        if (empty($event)) {
+            return;
+        }
+
+        if('Hangup' === $event){
+            $linkedId = $parameters['Linkedid'] ?? '';
+            $channel  = $parameters['Channel'] ?? '';
+            if (empty($linkedId) || empty($channel)) {
+                return;
+            }
             $endpoint = self::getEndpointName($channel);
             unset($this->activeChannels[$linkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
@@ -741,22 +854,27 @@ class WorkerActiveCalls extends WorkerBase
                 unset($this->activeChannels[$linkedId]);
                 unset($this->callType[$linkedId]);
             }
-        }elseif(in_array($parameters['Event'],['Newchannel','Newstate']) && stripos($parameters['Channel'], 'local') === false){
-            $linkedId = $parameters['Linkedid'];
-            $endpoint   = self::getEndpointName($parameters['Channel']);
+        }elseif(in_array($event, ['Newchannel','Newstate']) && stripos($parameters['Channel'] ?? '', 'local') === false){
+            $linkedId = $parameters['Linkedid'] ?? '';
+            $channel = $parameters['Channel'] ?? '';
+            if (empty($linkedId) || empty($channel)) {
+                return;
+            }
+            $endpoint = self::getEndpointName($channel);
 
-            if(str_starts_with($parameters['Context'], 'ivr-')){
-                $extension = str_replace('ivr-', '', $parameters['Context']);
+            $context = $parameters['Context'] ?? '';
+            if(strpos($context, 'ivr-') === 0){
+                $extension = str_replace('ivr-', '', $context);
                 $inApp = true;
             }else{
-                $extension = $parameters['Exten'];
-                $inApp = $parameters['Context'] === 'applications';
+                $extension = $parameters['Exten'] ?? '';
+                $inApp = $context === 'applications';
             }
 
             $chanData = [
-                'ChannelStateDesc'  => $parameters['ChannelStateDesc'],
-                'CallerIDNum'       => $parameters['CallerIDNum'],
-                'Uniqueid'          => $parameters['Uniqueid'],
+                'ChannelStateDesc'  => $parameters['ChannelStateDesc'] ?? '',
+                'CallerIDNum'       => $parameters['CallerIDNum'] ?? '',
+                'Uniqueid'          => $parameters['Uniqueid'] ?? '',
                 'Endpoint'          => $endpoint,
                 'Type'              => (stripos($endpoint, 'SIP-') !== false)?self::ENDPOINT_TYPE_PROVIDER:self::ENDPOINT_TYPE_PEER,
                 'Exten'             => $extension,
@@ -764,7 +882,7 @@ class WorkerActiveCalls extends WorkerBase
             ];
 
             if($chanData['Type'] === self::ENDPOINT_TYPE_PEER){
-                $this->states[$endpoint]['channels'][$parameters['Channel']] = true;
+                $this->states[$endpoint]['channels'][$channel] = true;
                 if($this->states[$endpoint]['state'] <> self::STATE_UP){
                     $this->states[$endpoint]['state'] = $chanData['ChannelStateDesc'];
                 }
@@ -773,66 +891,87 @@ class WorkerActiveCalls extends WorkerBase
                 $did = '';
                 if($chanData['Type'] === self::ENDPOINT_TYPE_PROVIDER){
                     $callType = self::CALL_TYPE_IN;
-                    $did = $parameters['Exten'];
-                }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && strlen($parameters['Exten']) < 5){
+                    $did = $extension;
+                }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && strlen($extension) < 5){
                     $callType = self::CALL_TYPE_INNER;
                 }else{
                     $callType = self::CALL_TYPE_OUT;
                 }
                 $this->callType[$linkedId] = [
                     'type'      => $callType,
-                    'src_chan'  => $parameters['Channel'],
+                    'src_chan'  => $channel,
                     'did'       => $did,
                     'time'     => str_replace('mikopbx-','',$chanData['Uniqueid'])
                 ];
             }
 
-            if($this->callType[$linkedId]['src_chan'] <> $parameters['Channel'] &&  $chanData['ChannelStateDesc'] === self::STATE_UP){
+            if(($this->callType[$linkedId]['src_chan'] ?? '') !== $channel && $chanData['ChannelStateDesc'] === self::STATE_UP){
                 // Обновляем время ответа на вызов.
-                $this->callType[$linkedId]['answer'] = $parameters['Timestamp'];
+                $this->callType[$linkedId]['answer'] = $parameters['Timestamp'] ?? time();
             }
-            $this->activeChannels[$linkedId][$parameters['Channel']] = $chanData;
-        }elseif ('NewCallerid' === $parameters['Event'] && str_starts_with($parameters['Channel'], 'PJSIP/') &&
-                 isset($this->activeChannels[$parameters['Linkedid']][$parameters['Channel']]) ){
-            $this->activeChannels[$parameters['Linkedid']][$parameters['Channel']]['CallerIDNum'] = $parameters['CallerIDNum'];
-        }elseif ('BridgeEnter' === $parameters['Event']){
-            $linkedId = $parameters['Linkedid'];
-            $this->activeBridges[$linkedId][$parameters['BridgeUniqueid']][$parameters['Channel']] = $parameters['Timestamp'];
-        }elseif ('ChanSpyStart' === $parameters['Event']){
+            $this->activeChannels[$linkedId][$channel] = $chanData;
+        }elseif ('NewCallerid' === $event){
+            $ncChannel = $parameters['Channel'] ?? '';
+            $ncLinkedId = $parameters['Linkedid'] ?? '';
+            if (!empty($ncChannel) && strpos($ncChannel, 'PJSIP/') === 0 &&
+                 isset($this->activeChannels[$ncLinkedId][$ncChannel])) {
+                $this->activeChannels[$ncLinkedId][$ncChannel]['CallerIDNum'] = $parameters['CallerIDNum'] ?? '';
+            }
+        }elseif ('BridgeEnter' === $event){
+            $linkedId = $parameters['Linkedid'] ?? '';
+            $bridgeUniqueid = $parameters['BridgeUniqueid'] ?? '';
+            $beChannel = $parameters['Channel'] ?? '';
+            if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
+                $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
+            }
+        }elseif ('ChanSpyStart' === $event){
+            $spyerChannel = $parameters['SpyerChannel'] ?? '';
+            $spyerLinkedId = $parameters['SpyerLinkedid'] ?? '';
+            $spyeeLinkedId = $parameters['SpyeeLinkedid'] ?? '';
+            if (empty($spyerLinkedId) || empty($spyeeLinkedId)) {
+                return;
+            }
 
-            if(stripos($parameters['SpyerChannel'], 'local') !==false){
-                $linkedId = $parameters['SpyerLinkedid'];
+            if(stripos($spyerChannel, 'local') !== false){
+                $linkedId = $spyerLinkedId;
                 $tmpBridgeStart = time();
-                $tmpDstChannel =  $this->swapLocalSuffix($parameters['SpyerChannel']);
-                $orgChan = $this->findBridgeChannel($linkedId,$tmpDstChannel, $tmpBridgeStart)?$tmpDstChannel:'';
+                $tmpDstChannel = $this->swapLocalSuffix($spyerChannel);
+                $orgChan = $this->findBridgeChannel($linkedId, $tmpDstChannel, $tmpBridgeStart) ? $tmpDstChannel : '';
             }else{
-                $orgChan = $parameters['SpyerChannel'];
+                $orgChan = $spyerChannel;
             }
-            $this->spyerChannels[$parameters['SpyerLinkedid']] = [
+            $this->spyerChannels[$spyerLinkedId] = [
                 'spyer' => true,
                 'src_chan'       => $orgChan,
-                'src_num'        => $parameters['SpyerCallerIDNum'],
-                'dst_chan'       => $parameters['SpyeeChannel'],
-                'dst_num'        => $parameters['SpyeeCallerIDNum'],
+                'src_num'        => $parameters['SpyerCallerIDNum'] ?? '',
+                'dst_chan'       => $parameters['SpyeeChannel'] ?? '',
+                'dst_num'        => $parameters['SpyeeCallerIDNum'] ?? '',
             ];
-            $this->spyerChannels[$parameters['SpyeeLinkedid']] = [
+            $this->spyerChannels[$spyeeLinkedId] = [
                 'spyer' => false,
                 'src_chan'       => $orgChan,
-                'src_num'        => $parameters['SpyerCallerIDNum'],
-                'dst_chan'       => $parameters['SpyeeChannel'],
-                'dst_num'        => $parameters['SpyeeCallerIDNum'],
+                'src_num'        => $parameters['SpyerCallerIDNum'] ?? '',
+                'dst_chan'       => $parameters['SpyeeChannel'] ?? '',
+                'dst_num'        => $parameters['SpyeeCallerIDNum'] ?? '',
             ];
 
-        }elseif ('ChanSpyStop' === $parameters['Event']){
+        }elseif ('ChanSpyStop' === $event){
+            $spyeeLinkedId = $parameters['SpyeeLinkedid'] ?? '';
+            $spyerLinkedId = $parameters['SpyerLinkedid'] ?? '';
             unset(
-                $this->spyerChannels[$parameters['SpyeeLinkedid']],
-                $this->spyerChannels[$parameters['SpyerLinkedid']]
+                $this->spyerChannels[$spyeeLinkedId],
+                $this->spyerChannels[$spyerLinkedId]
             );
-        }elseif ('BridgeLeave' === $parameters['Event']){
-            $linkedId = $parameters['Linkedid'];
-            unset($this->activeBridges[$linkedId][$parameters['BridgeUniqueid']][$parameters['Channel']]);
-            if(empty($this->activeBridges[$linkedId][$parameters['BridgeUniqueid']])){
-                unset($this->activeBridges[$linkedId][$parameters['BridgeUniqueid']]);
+        }elseif ('BridgeLeave' === $event){
+            $linkedId = $parameters['Linkedid'] ?? '';
+            $bridgeUniqueid = $parameters['BridgeUniqueid'] ?? '';
+            $blChannel = $parameters['Channel'] ?? '';
+            if (empty($linkedId) || empty($bridgeUniqueid) || empty($blChannel)) {
+                return;
+            }
+            unset($this->activeBridges[$linkedId][$bridgeUniqueid][$blChannel]);
+            if(empty($this->activeBridges[$linkedId][$bridgeUniqueid])){
+                unset($this->activeBridges[$linkedId][$bridgeUniqueid]);
             }
             if(empty($this->activeBridges[$linkedId])){
                 unset($this->activeBridges[$linkedId]);
@@ -859,20 +998,40 @@ class WorkerActiveCalls extends WorkerBase
      */
     public function queueEvents($parameters):void
     {
-        if('QueueCallerJoin' === $parameters['Event']){
-            $this->queueEntryes[$parameters['Queue']][$parameters['Channel']] = [
-                'EnterTime'     => time(),
-                'Uniqueid'      => $parameters['Uniqueid'],
-                'Linkedid'      => $parameters['Linkedid']
-            ];
+        $event = $parameters['Event'] ?? '';
+        if (empty($event)) {
+            return;
+        }
 
-            $this->callType[$parameters['Linkedid']]['queue'] = $parameters['Queue'];
-        }elseif ('QueueMemberStatus' === $parameters['Event'] && isset($this->mobileStates[$parameters['MemberName']])){
-            $this->mobileStates[$parameters['MemberName']]['state'] = self::QUEUE_AGENT_STATES[$parameters['Status']]??self::STATE_UNAVAILIBLE;
-        }elseif ('QueueCallerLeave' === $parameters['Event'] ){
-            unset($this->queueEntryes[$parameters['Queue']][$parameters['Channel']]);
-            if(empty($this->queueEntryes[$parameters['Queue']])){
-                unset($this->queueEntryes[$parameters['Queue']]);
+        if('QueueCallerJoin' === $event){
+            $queue = $parameters['Queue'] ?? '';
+            $channel = $parameters['Channel'] ?? '';
+            $linkedId = $parameters['Linkedid'] ?? '';
+            if (empty($queue) || empty($channel)) {
+                return;
+            }
+            $this->queueEntryes[$queue][$channel] = [
+                'EnterTime'     => time(),
+                'Uniqueid'      => $parameters['Uniqueid'] ?? '',
+                'Linkedid'      => $linkedId
+            ];
+            if (!empty($linkedId)) {
+                $this->callType[$linkedId]['queue'] = $queue;
+            }
+        }elseif ('QueueMemberStatus' === $event){
+            $memberName = $parameters['MemberName'] ?? '';
+            if (!empty($memberName) && isset($this->mobileStates[$memberName])){
+                $this->mobileStates[$memberName]['state'] = self::QUEUE_AGENT_STATES[$parameters['Status'] ?? ''] ?? self::STATE_UNAVAILABLE;
+            }
+        }elseif ('QueueCallerLeave' === $event){
+            $queue = $parameters['Queue'] ?? '';
+            $channel = $parameters['Channel'] ?? '';
+            if (empty($queue) || empty($channel)) {
+                return;
+            }
+            unset($this->queueEntryes[$queue][$channel]);
+            if(empty($this->queueEntryes[$queue])){
+                unset($this->queueEntryes[$queue]);
             }
         }else{
             return;
@@ -889,7 +1048,12 @@ class WorkerActiveCalls extends WorkerBase
      */
     public function stateEvents($parameters):void
     {
-        if ($parameters['Event'] === 'UserEvent' && $this->replyOnPingRequest($parameters)){
+        $event = $parameters['Event'] ?? '';
+        if (empty($event)) {
+            return;
+        }
+
+        if ($event === 'UserEvent' && $this->replyOnPingRequest($parameters)){
             $this->logger->writeInfo($parameters,'update settings...');
             $this->getExtensionsInfo();
             $this->collectQueuesInfo();
@@ -899,9 +1063,10 @@ class WorkerActiveCalls extends WorkerBase
             $this->printActiveCalls();
             return;
         }
-        if($parameters['Event'] === 'ExtensionStatus'){
-            if(isset($this->states[$parameters['Exten']])){
-                $this->states[$parameters['Exten']]['state'] = $parameters['StatusText'];
+        if($event === 'ExtensionStatus'){
+            $exten = $parameters['Exten'] ?? '';
+            if(!empty($exten) && isset($this->states[$exten])){
+                $this->states[$exten]['state'] = $parameters['StatusText'] ?? '';
                 $this->logger->writeInfo($parameters,'stateEvents...');
                 $this->printActiveCalls();
                 $this->updateCacheState();
