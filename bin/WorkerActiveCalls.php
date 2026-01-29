@@ -474,6 +474,16 @@ class WorkerActiveCalls extends WorkerBase
             }
         }
 
+        // Строим карту channel -> ConnectedLineNum из activeChannels
+        $channelToConnectedLine = [];
+        foreach ($this->activeChannels as $linkedId => $channels) {
+            foreach ($channels as $channel => $data) {
+                if (!empty($data['ConnectedLineNum'])) {
+                    $channelToConnectedLine[$channel] = $data['ConnectedLineNum'];
+                }
+            }
+        }
+
         // Обновляем channels в копии states
         foreach ($states as $endpoint => &$stateData) {
             if (empty($stateData['channels'])) {
@@ -484,8 +494,9 @@ class WorkerActiveCalls extends WorkerBase
                 if (isset($channelConnections[$channel])) {
                     $enrichedChannels[$channel] = $channelConnections[$channel];
                 } else {
-                    // Канал не в бридже (звонит/ожидает)
-                    $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                    // Канал не в бридже (звонит/ожидает) - используем ConnectedLineNum
+                    $connectedNum = $channelToConnectedLine[$channel] ?? '';
+                    $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum];
                 }
             }
             $stateData['channels'] = $enrichedChannels;
@@ -645,6 +656,7 @@ class WorkerActiveCalls extends WorkerBase
                 $chanData = [
                     'ChannelStateDesc'  => $this->amCustom->GetVar($channel, 'CHANNEL(state)', '', false),
                     'CallerIDNum'       => $this->amCustom->GetVar($channel, 'CALLERID(num)','', false),
+                    'ConnectedLineNum'  => $this->amCustom->GetVar($channel, 'CONNECTEDLINE(num)','', false),
                     'Uniqueid'          => $this->amCustom->GetVar($channel, 'CHANNEL(uniqueid)','', false),
                     'Endpoint'          => $endpoint,
                     'Type'              => (stripos($endpoint, 'SIP-') !== false)?self::ENDPOINT_TYPE_PROVIDER:self::ENDPOINT_TYPE_PEER,
@@ -884,6 +896,7 @@ class WorkerActiveCalls extends WorkerBase
             $chanData = [
                 'ChannelStateDesc'  => $parameters['ChannelStateDesc'] ?? '',
                 'CallerIDNum'       => $parameters['CallerIDNum'] ?? '',
+                'ConnectedLineNum'  => $parameters['ConnectedLineNum'] ?? '',
                 'Uniqueid'          => $parameters['Uniqueid'] ?? '',
                 'Endpoint'          => $endpoint,
                 'Type'              => (stripos($endpoint, 'SIP-') !== false)?self::ENDPOINT_TYPE_PROVIDER:self::ENDPOINT_TYPE_PEER,
