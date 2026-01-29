@@ -63,6 +63,7 @@ class WorkerActiveCalls extends WorkerBase
         'UserEvent',
         'ExtensionStatus',
         'NewCallerid',
+        'NewConnectedLine',
         'BridgeEnter',
         'BridgeLeave',
         'ChanSpyStart',
@@ -478,8 +479,10 @@ class WorkerActiveCalls extends WorkerBase
         $channelToConnectedLine = [];
         foreach ($this->activeChannels as $linkedId => $channels) {
             foreach ($channels as $channel => $data) {
-                if (!empty($data['ConnectedLineNum'])) {
-                    $channelToConnectedLine[$channel] = $data['ConnectedLineNum'];
+                $connectedNum = $data['ConnectedLineNum'] ?? '';
+                // Фильтруем <unknown> и подобные значения
+                if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
+                    $channelToConnectedLine[$channel] = $connectedNum;
                 }
             }
         }
@@ -939,6 +942,15 @@ class WorkerActiveCalls extends WorkerBase
             if (!empty($ncChannel) && strpos($ncChannel, 'PJSIP/') === 0 &&
                  isset($this->activeChannels[$ncLinkedId][$ncChannel])) {
                 $this->activeChannels[$ncLinkedId][$ncChannel]['CallerIDNum'] = $parameters['CallerIDNum'] ?? '';
+            }
+        }elseif ('NewConnectedLine' === $event){
+            $nclChannel = $parameters['Channel'] ?? '';
+            $nclLinkedId = $parameters['Linkedid'] ?? '';
+            $connectedNum = $parameters['ConnectedLineNum'] ?? '';
+            if (!empty($nclChannel) && !empty($nclLinkedId) &&
+                 isset($this->activeChannels[$nclLinkedId][$nclChannel]) &&
+                 !empty($connectedNum) && strpos($connectedNum, '<') === false) {
+                $this->activeChannels[$nclLinkedId][$nclChannel]['ConnectedLineNum'] = $connectedNum;
             }
         }elseif ('BridgeEnter' === $event){
             $linkedId = $parameters['Linkedid'] ?? '';
