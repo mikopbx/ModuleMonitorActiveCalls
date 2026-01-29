@@ -163,8 +163,10 @@ class WorkerActiveCalls extends WorkerBase
                 foreach (array_keys($this->activeChannels[$linkedId]) as $channel) {
                     if (!isset($actualChannels[$channel])) {
                         unset($this->activeChannels[$linkedId][$channel]);
-                        $endpoint = self::getEndpointName($channel);
-                        unset($this->states[$endpoint]['channels'][$channel]);
+                        if(strpos($channel, '/') !== false) {
+                            $endpoint = self::getEndpointName($channel);
+                            unset($this->states[$endpoint]['channels'][$channel]);
+                        }
                     }
                 }
 
@@ -626,6 +628,10 @@ class WorkerActiveCalls extends WorkerBase
                 if(stripos($channel, 'local') !== false) {
                     continue;
                 }
+                // Пропускаем каналы без слеша (например, OutgoingSpoolFailed)
+                if(strpos($channel, '/') === false) {
+                    continue;
+                }
                 $endpoint   = self::getEndpointName($channel);
                 $context    = $this->amCustom->GetVar($channel, 'CONTEXT', '', false);
                 if(strpos($context, 'ivr-') === 0){
@@ -844,7 +850,7 @@ class WorkerActiveCalls extends WorkerBase
         if('Hangup' === $event){
             $linkedId = $parameters['Linkedid'] ?? '';
             $channel  = $parameters['Channel'] ?? '';
-            if (empty($linkedId) || empty($channel)) {
+            if (empty($linkedId) || empty($channel) || strpos($channel, '/') === false) {
                 return;
             }
             $endpoint = self::getEndpointName($channel);
@@ -858,6 +864,10 @@ class WorkerActiveCalls extends WorkerBase
             $linkedId = $parameters['Linkedid'] ?? '';
             $channel = $parameters['Channel'] ?? '';
             if (empty($linkedId) || empty($channel)) {
+                return;
+            }
+            // Пропускаем каналы без слеша (например, OutgoingSpoolFailed)
+            if(strpos($channel, '/') === false) {
                 return;
             }
             $endpoint = self::getEndpointName($channel);
