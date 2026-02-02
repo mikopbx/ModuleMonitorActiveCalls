@@ -49,4 +49,6 @@ return [
     'module_monitorCalls_legendTitleSpy' => 'Eavesdropping',
     'module_monitorCalls_needSelectQueue' => 'Select a queue',
     'module_monitorCalls_legendTitleCalling' => 'Dialing',
+    'module_monitorCalls_noWaitingCalls' => 'No waiting calls',
+    'module_monitorCalls_saveQueuesFilter' => 'Apply',
 ];

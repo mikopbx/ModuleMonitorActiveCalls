@@ -84,18 +84,19 @@ class ModuleMonitorActiveCallsController extends BaseController
         $this->view->userId = $userId;
         $this->view->userNumber = $userNumber;
         $this->view->cid = $cid;
-        $this->view->queueId = '';
+        $this->view->queueIds = [];
 
         $settings = UsersSettings::find([
             'userId=:userId:',
             'bind' => [
-                'userId' => $userId,
+                'userId' => (string)$userId,
             ]
         ]);
         $minWaitVisible = 0;
         foreach ($settings as $setting){
-            if('queueId' === $setting->key ){
-                $this->view->queueId  = $setting->value;
+            if('queueIds' === $setting->key ){
+                $decoded = json_decode($setting->value, true);
+                $this->view->queueIds = is_array($decoded) ? $decoded : [];
             }elseif ('minWaitVisible' === $setting->key ){
                 $minWaitVisible = intval($setting->value);
             }
@@ -190,9 +191,10 @@ class ModuleMonitorActiveCallsController extends BaseController
             }
             $settings->value = $data['minWaitVisible']??'';
             $this->view->success = $settings->save();
-        }elseif (isset($data['queueId']) ){
+        }elseif (isset($data['queueIds']) ){
             [,,$userId,] = $this->getUserData();
-            $key = 'queueId';
+            $userId = (string)$userId;
+            $key = 'queueIds';
             $settings = UsersSettings::findFirst([
                 'userId=:userId: AND key=:key:',
                 'bind' => [
@@ -205,7 +207,13 @@ class ModuleMonitorActiveCallsController extends BaseController
                 $settings->userId = $userId;
                 $settings->key = $key;
             }
-            $settings->value = $data['queueId']??'';
+            // Принимаем массив или JSON-строку
+            $queueIds = $data['queueIds'];
+            if (is_string($queueIds)) {
+                $decoded = json_decode($queueIds, true);
+                $queueIds = is_array($decoded) ? $decoded : [];
+            }
+            $settings->value = json_encode(is_array($queueIds) ? $queueIds : []);
             $this->view->success = $settings->save();
         }
         $this->view->data = $data;

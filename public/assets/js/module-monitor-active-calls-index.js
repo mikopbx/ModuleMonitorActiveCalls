@@ -1,15 +1,15 @@
 "use strict";
 
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
-function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i["return"]) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
 function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
 function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
 function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
-function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t["return"] || t["return"](); } finally { if (u) throw o; } } }; }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
 function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
+function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
 function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
 function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
 function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
@@ -19,7 +19,7 @@ function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLim
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
-function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t["return"] && (u = t["return"](), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 /*
  * Copyright (C) MIKO LLC - All Rights Reserved
@@ -37,7 +37,7 @@ var inputClassName = 'mikopbx-module-input';
 var ModuleMonitorActiveCalls = {
   isInit: true,
   contactsCacheTtlMs: 120 * 60 * 1000,
-  queueNameSelector: '#app-queue div.scrolling.dropdown',
+  queuesFilterSelector: '#queuesFilter',
   $formObj: $('#' + idForm),
   $checkBoxes: $('#' + idForm + ' .ui.checkbox'),
   $dropDowns: $('#' + idForm + ' .ui.dropdown'),
@@ -75,47 +75,115 @@ var ModuleMonitorActiveCalls = {
       delimiters: ["<%", "%>"],
       methods: {
         updatedCallsFromResponse: function updatedCallsFromResponse(data) {
-          var _this = this;
           // Keep last payload to allow re-render on queue switch (WS mode).
           this.lastActiveCallsPayload = data;
-          var queueNameEl = $(window[className].queueNameSelector);
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
-          this.queues = data.queues;
-          this.allCalls = data.calls;
-          var queueId = $('#queueId').val();
-          if (queueId in data.queues) {
-            this.id = data.queues[queueId].id;
-            this.name = data.queues[queueId].name;
-            this.number = data.queues[queueId].number;
-            this.agents = data.queues[queueId].agents;
-            this.agentsList = this.buildAgentsList(this.agents);
-            this.calls = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
-          } else {
-            this.calls = [];
-            this.agentsList = [];
-          }
-          if (queueNameEl.dropdown('is hidden')) {
-            queueNameEl.dropdown({
-              onChange: function onChange(value, text, $choice) {
-                window[className].onChangeSetting('queueId', value);
-              }
-            });
-            if (queueNameEl.dropdown('get value') === '') {
-              window[className].isInit = true;
-              queueNameEl.dropdown('set value', $('#queueId').val());
-              window[className].isInit = false;
-            }
-          }
+          this.queues = data.queues || {};
+          this.allCalls = data.calls || [];
+
+          // Initialize multi-select dropdown if not yet done
+          this.initQueuesFilter();
 
           // Normalize Semantic UI Card typography after render
           this.$nextTick(function () {
-            _this.normalizeAgentCards();
+            this.normalizeAgentCards();
+          });
+        },
+        initQueuesFilter: function initQueuesFilter() {
+          var self = this;
+          var $filter = $(window[className].queuesFilterSelector);
+          if ($filter.length === 0) return;
+
+          // Wait for Vue to render menu items
+          this.$nextTick(function () {
+            // Reinitialize dropdown to pick up new menu items
+            if ($filter.data('initialized')) {
+              // Dropdown already exists, just refresh menu
+              // Save current selection before refresh to prevent reset
+              var currentSelection = self.selectedQueueIds ? self.selectedQueueIds.slice() : [];
+              $filter.data('refreshing', true);
+              $filter.dropdown('refresh');
+              $filter.data('refreshing', false);
+
+              // Restore selection after refresh if it was cleared
+              if (currentSelection.length > 0 && (!self.selectedQueueIds || self.selectedQueueIds.length === 0)) {
+                self.selectedQueueIds = currentSelection;
+                $filter.dropdown('set exactly', currentSelection);
+              }
+
+              // After refresh, ensure default text is hidden if we have selections
+              if (self.selectedQueueIds && self.selectedQueueIds.length > 0) {
+                $filter.find('.default.text').hide();
+              } else {
+                $filter.find('.default.text').show();
+              }
+            } else {
+              // First time initialization
+              $filter.data('initialized', true);
+              $filter.dropdown({
+                fullTextSearch: true,
+                onChange: function onChange(value) {
+                  // Skip onChange during programmatic refresh
+                  if ($filter.data('refreshing')) {
+                    return;
+                  }
+                  // value is comma-separated string of selected queue IDs
+                  var selectedIds = value ? value.split(',').filter(function (v) {
+                    return v !== '';
+                  }) : [];
+                  self.selectedQueueIds = selectedIds;
+                  // Auto-save on change
+                  window[className].onChangeSetting('queueIds', JSON.stringify(selectedIds));
+                }
+              });
+
+              // Set initial values from hidden input
+              var savedQueueIds = [];
+              try {
+                var raw = $('#queueIds').val();
+                savedQueueIds = JSON.parse(raw || '[]');
+              } catch (e) {
+                savedQueueIds = [];
+              }
+              if (Array.isArray(savedQueueIds) && savedQueueIds.length > 0) {
+                window[className].isInit = true;
+                $filter.dropdown('set exactly', savedQueueIds);
+                self.selectedQueueIds = savedQueueIds;
+                window[className].isInit = false;
+                // Hide default text when values are selected
+                $filter.find('.default.text').hide();
+              }
+            }
           });
         },
         refreshFromLastPayload: function refreshFromLastPayload() {
           if (this.lastActiveCallsPayload) {
             this.updatedCallsFromResponse(this.lastActiveCallsPayload);
           }
+        },
+        getQueueCalls: function getQueueCalls(queueId) {
+          var queue = this.queues[queueId];
+          if (!queue) return [];
+          return Array.isArray(queue.calls) ? queue.calls : [];
+        },
+        getQueueAgentsList: function getQueueAgentsList(queueId) {
+          var queue = this.queues[queueId];
+          if (!queue || !queue.agents) return [];
+          return this.buildAgentsList(queue.agents);
+        },
+        hasWaitingCalls: function hasWaitingCalls(queueId) {
+          var calls = this.getQueueCalls(queueId);
+          var self = this;
+          for (var i = 0; i < calls.length; i++) {
+            var call = calls[i];
+            if (call.dst_chan === '' && call.queueData && call.queueData.EnterTime !== undefined) {
+              var elapsed = self.formatElapsedTime(call.queueData.EnterTime);
+              if (self.minWaitVisible <= elapsed) {
+                return true;
+              }
+            }
+          }
+          return false;
         },
         buildAgentsList: function buildAgentsList(agentsObj) {
           var entries = Object.entries(agentsObj || {});
@@ -172,25 +240,25 @@ var ModuleMonitorActiveCalls = {
           return window[className].formatElapsedTime(enterTime);
         },
         normalizeAgentCards: function normalizeAgentCards() {
-          var _this2 = this;
           if (!this.$el) return;
+          var self = this;
 
           // Cleanup artifacts from previous experiments (placeholders/spacers).
           var artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
           artifacts.forEach(function (el) {
-            return el.remove();
+            el.remove();
           });
 
           // Dense layout (masonry) that still fills left-to-right:
           // flex-wrap can't place items into vertical gaps under tall cards.
           this.ensureAgentCardsGridMasonry();
 
-          // Prevent "equal height" cards in one row (Semantic UI cards are flex).
-          var cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
-          if (cardsContainer) {
+          // Process all agent card containers (one per queue block)
+          var cardsContainers = this.$el.querySelectorAll('.ui.cards.agent-cards');
+          cardsContainers.forEach(function (cardsContainer) {
             cardsContainer.style.alignItems = 'flex-start';
             cardsContainer.style.alignContent = 'flex-start';
-          }
+          });
           var cards = this.$el.querySelectorAll('.ui.cards.agent-cards > .ui.card.agent-card');
           cards.forEach(function (card) {
             card.style.alignSelf = 'flex-start';
@@ -243,7 +311,7 @@ var ModuleMonitorActiveCalls = {
           // Grid masonry needs row-span calculation after layout.
           requestAnimationFrame(function () {
             requestAnimationFrame(function () {
-              _this2.layoutAgentCardsGridMasonry();
+              self.layoutAgentCardsGridMasonry();
             });
           });
         },
@@ -288,7 +356,7 @@ var ModuleMonitorActiveCalls = {
           container.style.setProperty('--agent-card-col-count', String(count));
         },
         ensureAgentCardsGridMasonry: function ensureAgentCardsGridMasonry() {
-          var _this3 = this;
+          var self = this;
           var styleId = 'agent-cards-layout-style';
           var styleEl = document.getElementById(styleId);
           if (!styleEl) {
@@ -298,25 +366,51 @@ var ModuleMonitorActiveCalls = {
           }
 
           // Grid masonry: fills left-to-right and can pack items into gaps.
-          styleEl.textContent = "\n.ui.cards.agent-cards.agent-cards-grid {\n  display: grid !important;\n  grid-template-columns: repeat(auto-fill, 240px);\n  justify-content: start;\n  gap: var(--agent-card-gap, 8px);\n  grid-auto-rows: 1px;\n  /* Prevent overlap with the legend block below */\n  margin-bottom: 1em !important;\n}\n.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {\n  width: 240px !important;\n  margin: 0 !important;\n  overflow: hidden;\n  /* reset from previous layouts */\n  align-self: start;\n}\n\t\t\t\t\t".trim();
-          var cardsContainer = this.$el && this.$el.querySelector ? this.$el.querySelector('.ui.cards.agent-cards') : null;
-          if (cardsContainer) {
+          // minmax(240px, 1fr) - карточки минимум 240px, растягиваются равномерно
+          styleEl.textContent = '\
+.ui.cards.agent-cards.agent-cards-grid {\
+  display: grid !important;\
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));\
+  justify-content: start;\
+  gap: var(--agent-card-gap, 8px);\
+  grid-auto-rows: 1px;\
+  margin-bottom: 1em !important;\
+}\
+.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {\
+  width: 100% !important;\
+  min-width: 0;\
+  margin: 0 !important;\
+  overflow: hidden;\
+  align-self: start;\
+}';
+
+          // Process all agent card containers (one per queue block)
+          var cardsContainers = this.$el ? this.$el.querySelectorAll('.ui.cards.agent-cards') : [];
+          cardsContainers.forEach(function (cardsContainer) {
             cardsContainer.classList.remove('agent-cards-masonry');
             cardsContainer.classList.remove('agent-cards-flex');
             cardsContainer.classList.add('agent-cards-grid');
+          });
 
-            // Bind once: relayout on resize.
-            if (!this._agentCardsResizeBound) {
-              this._agentCardsResizeBound = true;
-              window.addEventListener('resize', function () {
-                _this3.layoutAgentCardsGridMasonry();
-              });
-            }
+          // Bind once: relayout on resize.
+          if (!this._agentCardsResizeBound) {
+            this._agentCardsResizeBound = true;
+            window.addEventListener('resize', function () {
+              self.layoutAgentCardsGridMasonry();
+            });
           }
         },
         layoutAgentCardsGridMasonry: function layoutAgentCardsGridMasonry() {
           if (!this.$el) return;
-          var grid = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-grid');
+          var self = this;
+
+          // Process all grid containers (one per queue block)
+          var grids = this.$el.querySelectorAll('.ui.cards.agent-cards.agent-cards-grid');
+          grids.forEach(function (grid) {
+            self.layoutSingleGridMasonry(grid);
+          });
+        },
+        layoutSingleGridMasonry: function layoutSingleGridMasonry(grid) {
           if (!grid) return;
           var cs = window.getComputedStyle(grid);
           var rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
@@ -332,25 +426,27 @@ var ModuleMonitorActiveCalls = {
           var tall = items.filter(function (c) {
             return c.querySelector('.meta.agent-peer');
           });
-          var _short = items.filter(function (c) {
+          var short = items.filter(function (c) {
             return !c.querySelector('.meta.agent-peer');
           });
 
           // If we don't have both types, just do normal masonry spans.
-          if (!tall.length || !_short.length) {
+          if (!tall.length || !short.length) {
             items.forEach(function (item) {
               var h = item.getBoundingClientRect().height;
               var span = Math.max(1, Math.ceil((h + rowGap) / (rowHeight + rowGap)));
-              item.style.gridRowEnd = "span ".concat(span);
+              item.style.gridRowEnd = 'span ' + span;
             });
             return;
           }
-          var hs = Math.max.apply(Math, _toConsumableArray(_short.map(function (c) {
+          var shortHeights = short.map(function (c) {
             return c.getBoundingClientRect().height;
-          })));
-          var ht = Math.max.apply(Math, _toConsumableArray(tall.map(function (c) {
+          });
+          var tallHeights = tall.map(function (c) {
             return c.getBoundingClientRect().height;
-          })));
+          });
+          var hs = Math.max.apply(Math, shortHeights);
+          var ht = Math.max.apply(Math, tallHeights);
 
           // Want: 2*(hs + g) = (ht + g)  => g = ht - 2*hs
           var g = ht - 2 * hs;
@@ -358,14 +454,14 @@ var ModuleMonitorActiveCalls = {
           g = Math.max(0, Math.min(24, Math.round(g)));
 
           // Apply gap and enforce min-heights so the relation holds visually.
-          grid.style.setProperty('--agent-card-gap', "".concat(g, "px"));
+          grid.style.setProperty('--agent-card-gap', g + 'px');
           var shortH = Math.round(hs);
           var tallH = Math.round(Math.max(ht, 2 * hs + g));
-          _short.forEach(function (c) {
-            c.style.minHeight = "".concat(shortH, "px");
+          short.forEach(function (c) {
+            c.style.minHeight = shortH + 'px';
           });
           tall.forEach(function (c) {
-            c.style.minHeight = "".concat(tallH, "px");
+            c.style.minHeight = tallH + 'px';
           });
 
           // Now compute row spans from final rendered heights.
@@ -373,13 +469,13 @@ var ModuleMonitorActiveCalls = {
           items.forEach(function (item) {
             var h = item.getBoundingClientRect().height;
             var span = Math.max(1, Math.ceil((h + effectiveGap) / (rowHeight + effectiveGap)));
-            item.style.gridRowEnd = "span ".concat(span);
+            item.style.gridRowEnd = 'span ' + span;
           });
         },
         getSrcNumForAgent: function getSrcNumForAgent(agentNumber) {
           var result = '-';
           var answeredFound = false;
-          var _iterator = _createForOfIteratorHelper(this.calls),
+          var _iterator = _createForOfIteratorHelper(this.allCalls),
             _step;
           try {
             for (_iterator.s(); !(_step = _iterator.n()).done;) {
@@ -477,14 +573,11 @@ var ModuleMonitorActiveCalls = {
       data: {
         "minWaitVisible": 30,
         "nowTick": 0,
-        "name": "",
-        "number": "",
-        "queues": [],
-        "agents": {},
-        "agentsList": [],
+        "queues": {},
+        "allCalls": [],
+        "selectedQueueIds": [],
         "lastActiveCallsPayload": null,
-        "contactsByPhone10": {},
-        "calls": []
+        "contactsByPhone10": {}
       }
     });
     window[className].applyContactsCacheToQueueWidget();
@@ -712,6 +805,11 @@ var ModuleMonitorActiveCalls = {
     // Окончание форматирования базовой страницы
     //////
     this.startPollingActiveCalls();
+
+    // Allow settings to be saved after initialization
+    setTimeout(function () {
+      window[className].isInit = false;
+    }, 1000);
   },
   startUiTicker: function startUiTicker() {
     if (this._uiTicker) return;
@@ -736,7 +834,7 @@ var ModuleMonitorActiveCalls = {
     this._activeCallsPollTimer = null;
   },
   initContactsCache: function initContactsCache() {
-    var _this4 = this;
+    var _this = this;
     return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
       var _t;
       return _regenerator().w(function (_context) {
@@ -744,17 +842,17 @@ var ModuleMonitorActiveCalls = {
           case 0:
             _context.p = 0;
             _context.n = 1;
-            return _this4.idbLoadAllContacts();
+            return _this.idbLoadAllContacts();
           case 1:
-            _this4._contactsCacheByPhone10 = _context.v;
-            _this4.applyContactsCacheToQueueWidget();
+            _this._contactsCacheByPhone10 = _context.v;
+            _this.applyContactsCacheToQueueWidget();
             _context.n = 3;
             break;
           case 2:
             _context.p = 2;
             _t = _context.v;
             console.log('contacts cache init error', _t);
-            _this4._contactsCacheByPhone10 = {};
+            _this._contactsCacheByPhone10 = {};
           case 3:
             return _context.a(2);
         }
@@ -799,14 +897,14 @@ var ModuleMonitorActiveCalls = {
     });
   },
   idbPutContact: function idbPutContact(phone10, client) {
-    var _this5 = this;
+    var _this2 = this;
     return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2() {
       var db;
       return _regenerator().w(function (_context2) {
         while (1) switch (_context2.n) {
           case 0:
             _context2.n = 1;
-            return _this5.idbOpenContactsDb();
+            return _this2.idbOpenContactsDb();
           case 1:
             db = _context2.v;
             return _context2.a(2, new Promise(function (resolve, reject) {
@@ -832,14 +930,14 @@ var ModuleMonitorActiveCalls = {
     }))();
   },
   idbLoadAllContacts: function idbLoadAllContacts() {
-    var _this6 = this;
+    var _this3 = this;
     return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
       var db;
       return _regenerator().w(function (_context3) {
         while (1) switch (_context3.n) {
           case 0:
             _context3.n = 1;
-            return _this6.idbOpenContactsDb();
+            return _this3.idbOpenContactsDb();
           case 1:
             db = _context3.v;
             return _context3.a(2, new Promise(function (resolve, reject) {
@@ -849,7 +947,7 @@ var ModuleMonitorActiveCalls = {
               req.onsuccess = function () {
                 var map = {};
                 var now = Date.now();
-                var ttlMs = Number(_this6.contactsCacheTtlMs) || 120 * 60 * 1000;
+                var ttlMs = Number(_this3.contactsCacheTtlMs) || 120 * 60 * 1000;
                 var _iterator2 = _createForOfIteratorHelper(req.result || []),
                   _step2;
                 try {
@@ -864,7 +962,7 @@ var ModuleMonitorActiveCalls = {
                     } else if (phone10) {
                       // Cleanup expired/broken records
                       try {
-                        store["delete"](phone10);
+                        store.delete(phone10);
                       } catch (e) {/* ignore */}
                     }
                   }
@@ -947,7 +1045,7 @@ var ModuleMonitorActiveCalls = {
   },
   scheduleContactsWsTokenRefresh: function scheduleContactsWsTokenRefresh() {
     var _this$_authTokens2,
-      _this7 = this;
+      _this4 = this;
     // Proactively refresh token shortly before expiry by re-requesting backendEnable.
     if (this._contactsWsTokenTimer) {
       clearTimeout(this._contactsWsTokenTimer);
@@ -959,11 +1057,11 @@ var ModuleMonitorActiveCalls = {
     var refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
     this._contactsWsTokenTimer = setTimeout(function () {
       // Re-get tokens and reconnect WS
-      _this7.requestBackendEnable();
+      _this4.requestBackendEnable();
     }, refreshInSec * 1000);
   },
   scheduleContactsWsReconnect: function scheduleContactsWsReconnect(reason) {
-    var _this8 = this;
+    var _this5 = this;
     var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     if (this._contactsWsReconnectTimer) {
       clearTimeout(this._contactsWsReconnectTimer);
@@ -972,10 +1070,10 @@ var ModuleMonitorActiveCalls = {
     this._contactsWsReconnectAttempt = (this._contactsWsReconnectAttempt || 0) + 1;
     var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
     this._contactsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this8.isAccessTokenExpired(5)) {
-        _this8.requestBackendEnable();
+      if (forceReAuth || _this5.isAccessTokenExpired(5)) {
+        _this5.requestBackendEnable();
       } else {
-        _this8.connectContactsWs();
+        _this5.connectContactsWs();
       }
     }, delay);
     console.log('contacts ws reconnect scheduled', {
@@ -984,7 +1082,7 @@ var ModuleMonitorActiveCalls = {
     });
   },
   connectContactsWs: function connectContactsWs() {
-    var _this9 = this;
+    var _this6 = this;
     try {
       var _this$_authTokens3;
       var accessToken = (_this$_authTokens3 = this._authTokens) === null || _this$_authTokens3 === void 0 ? void 0 : _this$_authTokens3.access_token;
@@ -1003,10 +1101,10 @@ var ModuleMonitorActiveCalls = {
       this._contactsWs = new WebSocket(wsUrl);
       this._contactsWs.onopen = function () {
         console.log('contacts ws connected');
-        _this9.scheduleContactsWsTokenRefresh();
+        _this6.scheduleContactsWsTokenRefresh();
       };
       this._contactsWs.onmessage = function (event) {
-        _this9.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+        _this6.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
       };
       this._contactsWs.onerror = function (event) {
         console.log('contacts ws error', event);
@@ -1018,15 +1116,15 @@ var ModuleMonitorActiveCalls = {
           code: code,
           reason: reason
         });
-        if (_this9._contactsWsTokenTimer) {
-          clearTimeout(_this9._contactsWsTokenTimer);
-          _this9._contactsWsTokenTimer = null;
+        if (_this6._contactsWsTokenTimer) {
+          clearTimeout(_this6._contactsWsTokenTimer);
+          _this6._contactsWsTokenTimer = null;
         }
 
         // 1000 = normal close -> reconnect; auth closes vary by server implementation.
         var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this9.isAccessTokenExpired(0);
-        _this9.scheduleContactsWsReconnect('close', forceReAuth);
+        var forceReAuth = authCloseCodes.has(code) || _this6.isAccessTokenExpired(0);
+        _this6.scheduleContactsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('contacts ws init error', e);
@@ -1034,7 +1132,7 @@ var ModuleMonitorActiveCalls = {
     }
   },
   scheduleActiveCallsWsReconnect: function scheduleActiveCallsWsReconnect(reason) {
-    var _this0 = this;
+    var _this7 = this;
     var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     if (this._activeCallsWsReconnectTimer) {
       clearTimeout(this._activeCallsWsReconnectTimer);
@@ -1043,10 +1141,10 @@ var ModuleMonitorActiveCalls = {
     this._activeCallsWsReconnectAttempt = (this._activeCallsWsReconnectAttempt || 0) + 1;
     var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._activeCallsWsReconnectAttempt - 1)));
     this._activeCallsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this0.isAccessTokenExpired(5)) {
-        _this0.requestBackendEnable();
+      if (forceReAuth || _this7.isAccessTokenExpired(5)) {
+        _this7.requestBackendEnable();
       } else {
-        _this0.connectActiveCallsWs();
+        _this7.connectActiveCallsWs();
       }
     }, delay);
     console.log('active-calls ws reconnect scheduled', {
@@ -1055,7 +1153,7 @@ var ModuleMonitorActiveCalls = {
     });
   },
   connectActiveCallsWs: function connectActiveCallsWs() {
-    var _this1 = this;
+    var _this8 = this;
     try {
       var _this$_authTokens4;
       var accessToken = (_this$_authTokens4 = this._authTokens) === null || _this$_authTokens4 === void 0 ? void 0 : _this$_authTokens4.access_token;
@@ -1078,10 +1176,10 @@ var ModuleMonitorActiveCalls = {
       this._activeCallsWs.onopen = function () {
         console.log('active-calls ws connected');
         // Reuse the same token refresh timer (it triggers requestBackendEnable)
-        _this1.scheduleContactsWsTokenRefresh();
+        _this8.scheduleContactsWsTokenRefresh();
       };
       this._activeCallsWs.onmessage = function (event) {
-        _this1.handleActiveCallsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+        _this8.handleActiveCallsWsMessage(event === null || event === void 0 ? void 0 : event.data);
       };
       this._activeCallsWs.onerror = function (event) {
         console.log('active-calls ws error', event);
@@ -1096,8 +1194,8 @@ var ModuleMonitorActiveCalls = {
 
         // Auth closes vary by server implementation.
         var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this1.isAccessTokenExpired(0);
-        _this1.scheduleActiveCallsWsReconnect('close', forceReAuth);
+        var forceReAuth = authCloseCodes.has(code) || _this8.isAccessTokenExpired(0);
+        _this8.scheduleActiveCallsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('active-calls ws init error', e);
@@ -1120,7 +1218,7 @@ var ModuleMonitorActiveCalls = {
           if (phone10 && displayName) {
             this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
             this._contactsCacheByPhone10[phone10] = displayName;
-            this.idbPutContact(phone10, displayName)["catch"](function (e) {
+            this.idbPutContact(phone10, displayName).catch(function (e) {
               return console.log('contacts cache save error', e);
             });
           }
@@ -1180,7 +1278,8 @@ var ModuleMonitorActiveCalls = {
     if (window[className].isInit) {
       return;
     }
-    var data = _defineProperty({}, settingName, value);
+    var data = {};
+    data[settingName] = value;
     $.api({
       url: window[className].saveUserActionUrl,
       on: 'now',
@@ -1190,8 +1289,9 @@ var ModuleMonitorActiveCalls = {
         return response !== undefined && Object.keys(response).length > 0 && response.success === true;
       },
       onSuccess: function onSuccess(response) {
-        if (settingName === 'queueId') {
-          $('#queueId').val($(window[className].queueNameSelector).dropdown('get value'));
+        if (settingName === 'queueIds') {
+          // Update hidden input and Vue data
+          $('#queueIds').val(value);
           // Re-render queue widget from last received payload (WS mode)
           if (window[className].$widgetQueues && typeof window[className].$widgetQueues.refreshFromLastPayload === 'function') {
             window[className].$widgetQueues.refreshFromLastPayload();

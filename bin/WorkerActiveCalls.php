@@ -333,7 +333,7 @@ class WorkerActiveCalls extends WorkerBase
                 'spyer'     => false,
                 'spy_num'   => '',
                 'spy_chan'  => '',
-                'queueData' => $queueCalls[$linkedid]??[],
+                'queueData' => $this->getQueueData($queueCalls, $linkedid),
                 'lastQueue' => $this->callType[$linkedid]['queue']??''
             ];
             $dstChannel = $srcChan;
@@ -507,6 +507,30 @@ class WorkerActiveCalls extends WorkerBase
         unset($stateData);
 
         return $states;
+    }
+
+    /**
+     * Получение данных о времени входа в очередь.
+     * Использует queueCalls если доступно, иначе берёт из callType.
+     * @param array $queueCalls
+     * @param string $linkedid
+     * @return array
+     */
+    private function getQueueData(array $queueCalls, string $linkedid): array
+    {
+        if (!empty($queueCalls[$linkedid])) {
+            return $queueCalls[$linkedid];
+        }
+        // Fallback: использовать сохранённые данные из callType
+        $queueId = $this->callType[$linkedid]['queue'] ?? '';
+        $enterTime = $this->callType[$linkedid]['queueEnterTime'] ?? 0;
+        if (!empty($queueId) && $enterTime > 0) {
+            return [
+                'QueueID' => $queueId,
+                'EnterTime' => $enterTime,
+            ];
+        }
+        return [];
     }
 
     /**
@@ -1045,13 +1069,15 @@ class WorkerActiveCalls extends WorkerBase
             if (empty($queue) || empty($channel)) {
                 return;
             }
+            $enterTime = time();
             $this->queueEntryes[$queue][$channel] = [
-                'EnterTime'     => time(),
+                'EnterTime'     => $enterTime,
                 'Uniqueid'      => $parameters['Uniqueid'] ?? '',
                 'Linkedid'      => $linkedId
             ];
             if (!empty($linkedId)) {
                 $this->callType[$linkedId]['queue'] = $queue;
+                $this->callType[$linkedId]['queueEnterTime'] = $enterTime;
             }
         }elseif ('QueueMemberStatus' === $event){
             $memberName = $parameters['MemberName'] ?? '';

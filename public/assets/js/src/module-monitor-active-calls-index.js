@@ -14,7 +14,7 @@ const inputClassName = 'mikopbx-module-input';
 const ModuleMonitorActiveCalls = {
 	isInit: true,
 	contactsCacheTtlMs: 120 * 60 * 1000,
-	queueNameSelector: '#app-queue div.scrolling.dropdown',
+	queuesFilterSelector: '#queuesFilter',
 	$formObj: $('#'+idForm),
 	$checkBoxes: $('#'+idForm+' .ui.checkbox'),
 	$dropDowns: $('#'+idForm+' .ui.dropdown'),
@@ -58,45 +58,111 @@ const ModuleMonitorActiveCalls = {
 					// Keep last payload to allow re-render on queue switch (WS mode).
 					this.lastActiveCallsPayload = data;
 
-					let queueNameEl = $(window[className].queueNameSelector);
 					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
+					this.queues = data.queues || {};
+					this.allCalls = data.calls || [];
 
-					this.queues = data.queues;
-					this.allCalls = data.calls;
-					let queueId = $('#queueId').val();
-					if (queueId in data.queues) {
-						this.id     = data.queues[queueId].id;
-						this.name   = data.queues[queueId].name;
-						this.number = data.queues[queueId].number;
-						this.agents = data.queues[queueId].agents;
-						this.agentsList = this.buildAgentsList(this.agents);
-						this.calls  = Array.isArray(data.queues[queueId].calls) ? data.queues[queueId].calls : [];
-					}else{
-						this.calls  = [];
-						this.agentsList = [];
-					}
-					if(queueNameEl.dropdown('is hidden')){
-						queueNameEl.dropdown({
-							onChange: function onChange(value, text, $choice) {
-								window[className].onChangeSetting('queueId', value);
-							}
-						});
-						if(queueNameEl.dropdown('get value') === ''){
-							window[className].isInit = true;
-							queueNameEl.dropdown('set value', $('#queueId').val())
-							window[className].isInit = false;
-						}
-					}
+					// Initialize multi-select dropdown if not yet done
+					this.initQueuesFilter();
 
 					// Normalize Semantic UI Card typography after render
-					this.$nextTick(() => {
+					this.$nextTick(function() {
 						this.normalizeAgentCards();
+					});
+				},
+				initQueuesFilter() {
+					var self = this;
+					var $filter = $(window[className].queuesFilterSelector);
+					if ($filter.length === 0) return;
+
+					// Wait for Vue to render menu items
+					this.$nextTick(function() {
+						// Reinitialize dropdown to pick up new menu items
+						if ($filter.data('initialized')) {
+							// Dropdown already exists, just refresh menu
+							// Save current selection before refresh to prevent reset
+							var currentSelection = self.selectedQueueIds ? self.selectedQueueIds.slice() : [];
+							$filter.data('refreshing', true);
+							$filter.dropdown('refresh');
+							$filter.data('refreshing', false);
+
+							// Restore selection after refresh if it was cleared
+							if (currentSelection.length > 0 && (!self.selectedQueueIds || self.selectedQueueIds.length === 0)) {
+								self.selectedQueueIds = currentSelection;
+								$filter.dropdown('set exactly', currentSelection);
+							}
+
+							// After refresh, ensure default text is hidden if we have selections
+							if (self.selectedQueueIds && self.selectedQueueIds.length > 0) {
+								$filter.find('.default.text').hide();
+							} else {
+								$filter.find('.default.text').show();
+							}
+						} else {
+							// First time initialization
+							$filter.data('initialized', true);
+							$filter.dropdown({
+								fullTextSearch: true,
+								onChange: function(value) {
+									// Skip onChange during programmatic refresh
+									if ($filter.data('refreshing')) {
+										return;
+									}
+									// value is comma-separated string of selected queue IDs
+									var selectedIds = value ? value.split(',').filter(function(v) { return v !== ''; }) : [];
+									self.selectedQueueIds = selectedIds;
+									// Auto-save on change
+									window[className].onChangeSetting('queueIds', JSON.stringify(selectedIds));
+								}
+							});
+
+							// Set initial values from hidden input
+							var savedQueueIds = [];
+							try {
+								var raw = $('#queueIds').val();
+								savedQueueIds = JSON.parse(raw || '[]');
+							} catch (e) {
+								savedQueueIds = [];
+							}
+							if (Array.isArray(savedQueueIds) && savedQueueIds.length > 0) {
+								window[className].isInit = true;
+								$filter.dropdown('set exactly', savedQueueIds);
+								self.selectedQueueIds = savedQueueIds;
+								window[className].isInit = false;
+								// Hide default text when values are selected
+								$filter.find('.default.text').hide();
+							}
+						}
 					});
 				},
 				refreshFromLastPayload() {
 					if (this.lastActiveCallsPayload) {
 						this.updatedCallsFromResponse(this.lastActiveCallsPayload);
 					}
+				},
+				getQueueCalls(queueId) {
+					var queue = this.queues[queueId];
+					if (!queue) return [];
+					return Array.isArray(queue.calls) ? queue.calls : [];
+				},
+				getQueueAgentsList(queueId) {
+					var queue = this.queues[queueId];
+					if (!queue || !queue.agents) return [];
+					return this.buildAgentsList(queue.agents);
+				},
+				hasWaitingCalls(queueId) {
+					var calls = this.getQueueCalls(queueId);
+					var self = this;
+					for (var i = 0; i < calls.length; i++) {
+						var call = calls[i];
+						if (call.dst_chan === '' && call.queueData && call.queueData.EnterTime !== undefined) {
+							var elapsed = self.formatElapsedTime(call.queueData.EnterTime);
+							if (self.minWaitVisible <= elapsed) {
+								return true;
+							}
+						}
+					}
+					return false;
 				},
 				buildAgentsList(agentsObj) {
 					const entries = Object.entries(agentsObj || {});
@@ -149,30 +215,31 @@ const ModuleMonitorActiveCalls = {
 				},
 				normalizeAgentCards() {
 					if (!this.$el) return;
+					var self = this;
 
 					// Cleanup artifacts from previous experiments (placeholders/spacers).
-					const artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
-					artifacts.forEach((el) => el.remove());
+					var artifacts = this.$el.querySelectorAll('.agent-peer-placeholder, .agent-peer-spacer');
+					artifacts.forEach(function(el) { el.remove(); });
 
 					// Dense layout (masonry) that still fills left-to-right:
 					// flex-wrap can't place items into vertical gaps under tall cards.
 					this.ensureAgentCardsGridMasonry();
 
-					// Prevent "equal height" cards in one row (Semantic UI cards are flex).
-					const cardsContainer = this.$el.querySelector('.ui.cards.agent-cards');
-					if (cardsContainer) {
+					// Process all agent card containers (one per queue block)
+					var cardsContainers = this.$el.querySelectorAll('.ui.cards.agent-cards');
+					cardsContainers.forEach(function(cardsContainer) {
 						cardsContainer.style.alignItems = 'flex-start';
 						cardsContainer.style.alignContent = 'flex-start';
-					}
+					});
 
-					const cards = this.$el.querySelectorAll('.ui.cards.agent-cards > .ui.card.agent-card');
-					cards.forEach((card) => {
+					var cards = this.$el.querySelectorAll('.ui.cards.agent-cards > .ui.card.agent-card');
+					cards.forEach(function(card) {
 						card.style.alignSelf = 'flex-start';
 					});
 
 					// Semantic UI makes .header bigger than normal text; we need same font size.
-					const headers = this.$el.querySelectorAll('.ui.card.agent-card .header.agent-card-header');
-					headers.forEach((el) => {
+					var headers = this.$el.querySelectorAll('.ui.card.agent-card .header.agent-card-header');
+					headers.forEach(function(el) {
 						el.style.fontSize = '1em';
 						el.style.lineHeight = '1.2';
 						el.style.display = 'flex';
@@ -181,15 +248,15 @@ const ModuleMonitorActiveCalls = {
 						el.style.whiteSpace = 'nowrap';
 					});
 
-					const metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
-					metas.forEach((el) => {
+					var metas = this.$el.querySelectorAll('.ui.card.agent-card .meta.agent-peer');
+					metas.forEach(function(el) {
 						el.style.fontSize = '1em';
 						el.style.lineHeight = '1.2';
 					});
 
 					// Normalize label/name typography so they have same text height.
-					const numLabels = this.$el.querySelectorAll('.ui.card.agent-card .agent-num-label');
-					numLabels.forEach((el) => {
+					var numLabels = this.$el.querySelectorAll('.ui.card.agent-card .agent-num-label');
+					numLabels.forEach(function(el) {
 						el.style.fontSize = '1em';
 						el.style.lineHeight = '1.2';
 						el.style.display = 'inline-flex';
@@ -204,8 +271,8 @@ const ModuleMonitorActiveCalls = {
 						el.style.textOverflow = 'ellipsis';
 						el.style.whiteSpace = 'nowrap';
 					});
-					const names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
-					names.forEach((el) => {
+					var names = this.$el.querySelectorAll('.ui.card.agent-card .agent-name');
+					names.forEach(function(el) {
 						el.style.lineHeight = '1.2';
 						// Ellipsis for long names (e.g. "Салтыков-Щедрин")
 						el.style.minWidth = '0';
@@ -216,9 +283,9 @@ const ModuleMonitorActiveCalls = {
 					});
 
 					// Grid masonry needs row-span calculation after layout.
-					requestAnimationFrame(() => {
-						requestAnimationFrame(() => {
-							this.layoutAgentCardsGridMasonry();
+					requestAnimationFrame(function() {
+						requestAnimationFrame(function() {
+							self.layoutAgentCardsGridMasonry();
 						});
 					});
 				},
@@ -266,8 +333,9 @@ const ModuleMonitorActiveCalls = {
 					container.style.setProperty('--agent-card-col-count', String(count));
 				},
 				ensureAgentCardsGridMasonry() {
-					const styleId = 'agent-cards-layout-style';
-					let styleEl = document.getElementById(styleId);
+					var self = this;
+					var styleId = 'agent-cards-layout-style';
+					var styleEl = document.getElementById(styleId);
 					if (!styleEl) {
 						styleEl = document.createElement('style');
 						styleEl.id = styleId;
@@ -275,101 +343,109 @@ const ModuleMonitorActiveCalls = {
 					}
 
 					// Grid masonry: fills left-to-right and can pack items into gaps.
-					styleEl.textContent = `
-.ui.cards.agent-cards.agent-cards-grid {
-  display: grid !important;
-  grid-template-columns: repeat(auto-fill, 240px);
-  justify-content: start;
-  gap: var(--agent-card-gap, 8px);
-  grid-auto-rows: 1px;
-  /* Prevent overlap with the legend block below */
-  margin-bottom: 1em !important;
-}
-.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {
-  width: 240px !important;
-  margin: 0 !important;
-  overflow: hidden;
-  /* reset from previous layouts */
-  align-self: start;
-}
-					`.trim();
+					// minmax(240px, 1fr) - карточки минимум 240px, растягиваются равномерно
+					styleEl.textContent = '\
+.ui.cards.agent-cards.agent-cards-grid {\
+  display: grid !important;\
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));\
+  justify-content: start;\
+  gap: var(--agent-card-gap, 8px);\
+  grid-auto-rows: 1px;\
+  margin-bottom: 1em !important;\
+}\
+.ui.cards.agent-cards.agent-cards-grid > .ui.card.agent-card {\
+  width: 100% !important;\
+  min-width: 0;\
+  margin: 0 !important;\
+  overflow: hidden;\
+  align-self: start;\
+}';
 
-					const cardsContainer = this.$el && this.$el.querySelector
-						? this.$el.querySelector('.ui.cards.agent-cards')
-						: null;
-					if (cardsContainer) {
+					// Process all agent card containers (one per queue block)
+					var cardsContainers = this.$el ? this.$el.querySelectorAll('.ui.cards.agent-cards') : [];
+					cardsContainers.forEach(function(cardsContainer) {
 						cardsContainer.classList.remove('agent-cards-masonry');
 						cardsContainer.classList.remove('agent-cards-flex');
 						cardsContainer.classList.add('agent-cards-grid');
+					});
 
-						// Bind once: relayout on resize.
-						if (!this._agentCardsResizeBound) {
-							this._agentCardsResizeBound = true;
-							window.addEventListener('resize', () => {
-								this.layoutAgentCardsGridMasonry();
-							});
-						}
+					// Bind once: relayout on resize.
+					if (!this._agentCardsResizeBound) {
+						this._agentCardsResizeBound = true;
+						window.addEventListener('resize', function() {
+							self.layoutAgentCardsGridMasonry();
+						});
 					}
 				},
 				layoutAgentCardsGridMasonry() {
 					if (!this.$el) return;
-					const grid = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-grid');
+					var self = this;
+
+					// Process all grid containers (one per queue block)
+					var grids = this.$el.querySelectorAll('.ui.cards.agent-cards.agent-cards-grid');
+					grids.forEach(function(grid) {
+						self.layoutSingleGridMasonry(grid);
+					});
+				},
+				layoutSingleGridMasonry(grid) {
 					if (!grid) return;
 
-					const cs = window.getComputedStyle(grid);
-					const rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
-					const rowGap = parseFloat(cs.getPropertyValue('row-gap')) || parseFloat(cs.getPropertyValue('gap')) || 8;
+					var cs = window.getComputedStyle(grid);
+					var rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
+					var rowGap = parseFloat(cs.getPropertyValue('row-gap')) || parseFloat(cs.getPropertyValue('gap')) || 8;
 
-					const items = Array.from(grid.querySelectorAll('.ui.card.agent-card'));
+					var items = Array.from(grid.querySelectorAll('.ui.card.agent-card'));
 					if (!items.length) return;
 
 					// Reset row spans and min-heights to measure natural heights.
-					items.forEach((item) => {
+					items.forEach(function(item) {
 						item.style.gridRowEnd = '';
 						item.style.minHeight = '';
 					});
 
-					const tall = items.filter((c) => c.querySelector('.meta.agent-peer'));
-					const short = items.filter((c) => !c.querySelector('.meta.agent-peer'));
+					var tall = items.filter(function(c) { return c.querySelector('.meta.agent-peer'); });
+					var short = items.filter(function(c) { return !c.querySelector('.meta.agent-peer'); });
 
 					// If we don't have both types, just do normal masonry spans.
 					if (!tall.length || !short.length) {
-						items.forEach((item) => {
-							const h = item.getBoundingClientRect().height;
-							const span = Math.max(1, Math.ceil((h + rowGap) / (rowHeight + rowGap)));
-							item.style.gridRowEnd = `span ${span}`;
+						items.forEach(function(item) {
+							var h = item.getBoundingClientRect().height;
+							var span = Math.max(1, Math.ceil((h + rowGap) / (rowHeight + rowGap)));
+							item.style.gridRowEnd = 'span ' + span;
 						});
 						return;
 					}
 
-					const hs = Math.max(...short.map((c) => c.getBoundingClientRect().height));
-					const ht = Math.max(...tall.map((c) => c.getBoundingClientRect().height));
+					var shortHeights = short.map(function(c) { return c.getBoundingClientRect().height; });
+					var tallHeights = tall.map(function(c) { return c.getBoundingClientRect().height; });
+					var hs = Math.max.apply(Math, shortHeights);
+					var ht = Math.max.apply(Math, tallHeights);
 
 					// Want: 2*(hs + g) = (ht + g)  => g = ht - 2*hs
-					let g = ht - 2 * hs;
+					var g = ht - 2 * hs;
 					if (!Number.isFinite(g)) g = rowGap;
 					g = Math.max(0, Math.min(24, Math.round(g)));
 
 					// Apply gap and enforce min-heights so the relation holds visually.
-					grid.style.setProperty('--agent-card-gap', `${g}px`);
+					grid.style.setProperty('--agent-card-gap', g + 'px');
 
-					const shortH = Math.round(hs);
-					const tallH = Math.round(Math.max(ht, 2 * hs + g));
-					short.forEach((c) => { c.style.minHeight = `${shortH}px`; });
-					tall.forEach((c) => { c.style.minHeight = `${tallH}px`; });
+					var shortH = Math.round(hs);
+					var tallH = Math.round(Math.max(ht, 2 * hs + g));
+					short.forEach(function(c) { c.style.minHeight = shortH + 'px'; });
+					tall.forEach(function(c) { c.style.minHeight = tallH + 'px'; });
 
 					// Now compute row spans from final rendered heights.
-					const effectiveGap = g;
-					items.forEach((item) => {
-						const h = item.getBoundingClientRect().height;
-						const span = Math.max(1, Math.ceil((h + effectiveGap) / (rowHeight + effectiveGap)));
-						item.style.gridRowEnd = `span ${span}`;
+					var effectiveGap = g;
+					items.forEach(function(item) {
+						var h = item.getBoundingClientRect().height;
+						var span = Math.max(1, Math.ceil((h + effectiveGap) / (rowHeight + effectiveGap)));
+						item.style.gridRowEnd = 'span ' + span;
 					});
 				},
 				getSrcNumForAgent(agentNumber) {
 					let result = '-';
 					let answeredFound  = false;
-					for (const call of this.calls) {
+					for (const call of this.allCalls) {
 						if(call.dst_num === agentNumber){
 							answeredFound = true;
 							result = call.src_num;
@@ -450,16 +526,11 @@ const ModuleMonitorActiveCalls = {
 			data: {
 				"minWaitVisible": 30,
 				"nowTick": 0,
-				"name": "",
-				"number": "",
-				"queues": [],
-				"agents": {
-				},
-				"agentsList": [],
+				"queues": {},
+				"allCalls": [],
+				"selectedQueueIds": [],
 				"lastActiveCallsPayload": null,
-				"contactsByPhone10": {},
-				"calls": [
-				]
+				"contactsByPhone10": {}
 			},
 		});
 		window[className].applyContactsCacheToQueueWidget();
@@ -655,6 +726,11 @@ const ModuleMonitorActiveCalls = {
 		// Окончание форматирования базовой страницы
 		//////
 		this.startPollingActiveCalls();
+
+		// Allow settings to be saved after initialization
+		setTimeout(function() {
+			window[className].isInit = false;
+		}, 1000);
 	},
 	startUiTicker() {
 		if (this._uiTicker) return;
@@ -1011,20 +1087,20 @@ const ModuleMonitorActiveCalls = {
 		if(window[className].isInit){
 			return;
 		}
-		let data = {
-			[settingName]: value
-		};
+		var data = {};
+		data[settingName] = value;
 		$.api({
 			url: window[className].saveUserActionUrl,
 			on: 'now',
 			method: 'POST',
 			data: data,
-			successTest(response) {
+			successTest: function(response) {
 				return response !== undefined && Object.keys(response).length > 0 && response.success === true;
 			},
-			onSuccess(response) {
-				if(settingName === 'queueId'){
-					$('#queueId').val($(window[className].queueNameSelector).dropdown('get value'));
+			onSuccess: function(response) {
+				if(settingName === 'queueIds'){
+					// Update hidden input and Vue data
+					$('#queueIds').val(value);
 					// Re-render queue widget from last received payload (WS mode)
 					if (window[className].$widgetQueues && typeof window[className].$widgetQueues.refreshFromLastPayload === 'function') {
 						window[className].$widgetQueues.refreshFromLastPayload();
@@ -1033,10 +1109,10 @@ const ModuleMonitorActiveCalls = {
 					window.location.href = window.location.href;
 				}
 			},
-			onFailure(response) {
+			onFailure: function(response) {
 				console.log(response);
 			},
-			onError(errorMessage, element, xhr) {
+			onError: function(errorMessage, element, xhr) {
 				console.log(errorMessage,xhr);
 			}
 		});

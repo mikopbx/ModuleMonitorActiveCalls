@@ -6,7 +6,8 @@
 <input id="roleName" type="hidden" value="{{ roleName }}">
 <input id="fullAccess" type="hidden" value="{{ fullAccess }}">
 <input id="session" type="hidden" value="{{ session }}">
-<input id="queueId" type="hidden" value="{{ queueId }}">
+<input id="userId" type="hidden" value="{{ userId }}">
+<input id="queueIds" type="hidden" value='{{ queueIds|json_encode }}'>
 <input id="minWaitVisibleValue" type="hidden" value="{{ minWaitVisibleValue }}">
 
 {% if cid !== "" %}
@@ -65,29 +66,34 @@
 <br>
 <br>
 <div id="app-queue" class="ui">
-    <div class="ui stackable two column grid">
-        <div class="four wide column">
-            <div class="ui top attached segment">
+    <!-- Мульти-выбор очередей -->
+    <div>
+        <div class="ui multiple search selection dropdown" id="queuesFilter">
+            <input type="hidden" name="queueIds">
+            <i class="dropdown icon"></i>
+            <input class="search" autocomplete="off" tabindex="0">
+            <div class="default text">{{ t._('module_monitorCalls_needSelectQueue') }}</div>
+            <div class="menu">
+                <div class="item" v-for="(queueData, id) in queues" :key="id" :data-value="id">
+                    <% queueData.name %> [<% queueData.number %>]
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Блоки очередей (каждая на отдельной строке) -->
+    <div v-for="queueId in selectedQueueIds" :key="queueId" class="ui segment queue-block" v-if="queues[queueId]">
+        <div class="ui stackable two column grid">
+            <!-- Левая колонка: название очереди и ожидающие -->
+            <div class="four wide column">
                 <h4 class="ui header">
                     <i class="users icon" aria-hidden="true"></i>
                     <div class="content">
-                        <span class="ui blue text"></span>
-                        <div class="ui scrolling dropdown">
-                          <input type="hidden">
-                          <div class="default text">{{ t._('module_monitorCalls_needSelectQueue') }}</div>
-                          <i class="dropdown icon"></i>
-                          <div class="menu">
-                           <div class="item" v-for="(queueData, id) in queues" :key="id" :data-value="id"> <% queueData.name %> [<% queueData.number %>]</div>
-                          </div>
-                        </div>
+                        <% queues[queueId].name %> [<% queues[queueId].number %>]
                     </div>
                 </h4>
-            </div>
-            <div class="ui bottom attached segment">
-                <!-- <h4 class="ui dividing header"> {{ t._('module_monitorCalls_waitingClients') }} </h4> -->
                 <div class="ui relaxed divided list">
-                    <div v-for="call in calls" v-if="call.dst_chan==='' && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
-                        <!-- <i class="small teal phone volume icon" aria-hidden="true"></i> -->
+                    <div v-for="call in getQueueCalls(queueId)" v-if="call.dst_chan==='' && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
                         <div class="content">
                             <div class="header">
                                 <i v-if="hasClientByPhone(call.src_num)" class="address book outline icon" aria-hidden="true"></i>
@@ -96,16 +102,20 @@
                             <div class="description">{{ t._('module_monitorCalls_waitingTitleClient') }}: <% formatElapsedTime(call.queueData.EnterTime) %></div>
                         </div>
                     </div>
+                    <div v-if="!hasWaitingCalls(queueId)" class="item">
+                        <div class="content">
+                            <div class="description" style="color: #999;">{{ t._('module_monitorCalls_noWaitingCalls') }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="twelve wide column">
-            <div class="ui segment">
+            <!-- Правая колонка: агенты (плитка) -->
+            <div class="twelve wide column">
                 <div class="ui cards agent-cards">
                     <div
-                        v-for="agent in agentsList"
-                        :key="agent.number"
+                        v-for="agent in getQueueAgentsList(queueId)"
+                        :key="queueId + '-' + agent.number"
                         class="ui card agent-card"
                         :class="{
                             'row-available': agent.state === 'Idle',
@@ -142,15 +152,26 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="ui tiny labels">
-                    <div class="ui green label"><i class="circle icon" aria-hidden="true"></i> {{ t._('module_monitorCalls_legendTitleIdle') }} </div>
-                    <div class="ui blue label"><i class="phone volume icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleInCall') }}</div>
-                    <div class="ui pink label"><i class="angle double right icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleCalling') }}</div>
-                    <div class="ui red label"><i class="user secret icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleSpy') }}</div>
-                    <div class="ui grey label"><i class="ban icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleDisable') }}</div>
-                </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Сообщение если очереди не выбраны -->
+    <div v-if="selectedQueueIds.length === 0" class="ui placeholder segment">
+        <div class="ui icon header">
+            <i class="users icon"></i>
+            {{ t._('module_monitorCalls_needSelectQueue') }}
+        </div>
+    </div>
+
+    <!-- Легенда -->
+    <div class="ui segment" v-if="selectedQueueIds.length > 0">
+        <div class="ui tiny labels">
+            <div class="ui green label"><i class="circle icon" aria-hidden="true"></i> {{ t._('module_monitorCalls_legendTitleIdle') }} </div>
+            <div class="ui blue label"><i class="phone volume icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleInCall') }}</div>
+            <div class="ui pink label"><i class="angle double right icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleCalling') }}</div>
+            <div class="ui red label"><i class="user secret icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleSpy') }}</div>
+            <div class="ui grey label"><i class="ban icon" aria-hidden="true"></i>{{ t._('module_monitorCalls_legendTitleDisable') }}</div>
         </div>
     </div>
 </div>
@@ -176,7 +197,7 @@
                                                                                     'row-dialing': (call.dst_num === '' && call.calledChannels && call.calledChannels.length),
                                                                                   }">
       <td class="collapsing">  <% formatTimestampToTime(call.start) %> </td>
-      <td class='need-update right aligned' :data-phone="call.src_num" :data-chan="call.src_chan" ><% getClientHeader(call.src_num) %></td>
+      <td :class="{'right aligned': true, 'need-update': call.typeCall !== 'incoming'}" :data-phone="call.src_num" ><% getClientHeader(call.src_num) %></td>
 
       <!--  Номер назначения начало -->
       <td v-if="call.dst_num" class="need-update" :data-phone="call.dst_num" :data-chan="call.dst_chan"><% getClientHeader(call.dst_num) %></td>
