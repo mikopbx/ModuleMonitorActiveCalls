@@ -11,7 +11,7 @@ return [
     'mo_ModuleModuleMonitorActiveCalls' => '',
     'BreadcrumbModuleMonitorActiveCalls' => '',
     'SubHeaderModuleMonitorActiveCalls' => '',
-    'module_template_AddNewRecord' => '',
+    'module_template_AddNewRecord' => 'เพิ่ม',
     'module_monitor_active_callsTextFieldLabel' => '',
     'module_monitor_active_callsTextAreaFieldLabel' => '',
     'module_monitor_active_callsPasswordFieldLabel' => '',
