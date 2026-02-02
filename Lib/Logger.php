@@ -50,8 +50,9 @@ class Logger
         $logPath = Directories::getDir(Directories::CORE_LOGS_DIR) . '/' . $this->module_name . '/';
         if (!file_exists($logPath)) {
             Util::mwMkdir($logPath);
-            Util::addRegularWWWRights($logPath);
         }
+        // Always ensure correct permissions on log directory
+        Util::addRegularWWWRights($logPath);
         $this->logFile = $logPath . $class . '.log';
         $this->initLogger();
     }

@@ -205,7 +205,7 @@ class AsteriskManager
      * @param array $parameters The parameters for the request (optional).
      * @return array The response from the socket.
      */
-    public function sendRequestTimeout(string $action, array $parameters = []): array
+    public function sendRequestTimeout(string $action, array $parameters = [], int $waitDuration = 0): array
     {
         if (! is_resource($this->socket) && !$this->connectDefault()) {
             return [];
@@ -229,6 +229,9 @@ class AsteriskManager
 
         $response = [];
         if ($result) {
+            if($waitDuration>0){
+                usleep($waitDuration);
+            }
             $response = $this->waitResponse(true);
         }
         return $response;
@@ -599,7 +602,7 @@ class AsteriskManager
      * @example examples/sip_show_peer.php Get information about a sip peer
      *
      */
-    public function connect(string $server = null, string $username = null, string $secret = null, string $events = 'on'): bool
+    public function connect(?string $server = null, ?string $username = null, ?string $secret = null, string $events = 'on'): bool
     {
         $this->listenEvents = $events;
         // use config if not specified
@@ -755,20 +758,19 @@ class AsteriskManager
      * Execute Command
      *
      * @param string $command
-     * @param ?string $actionid message matching variable
+     * @param ?string $actionId message matching variable
      *
      * @return array
      * @example examples/sip_show_peer.php Get information about a sip peer
      * @link    http://www.voip-info.org/wiki-Asterisk+Manager+API+Action+Command
      * @link    http://www.voip-info.org/wiki-Asterisk+CLI
      */
-    public function Command(string $command, string $actionid = null): array
+    public function Command(string $command, ?string $actionId = null): array
     {
         $parameters = ['Command' => $command];
-        if ($actionid) {
-            $parameters['ActionID'] = $actionid;
+        if ($actionId) {
+            $parameters['ActionID'] = $actionId;
         }
-
         return $this->sendRequest('Command', $parameters);
     }
 

@@ -3,8 +3,8 @@
 namespace Modules\ModuleMonitorActiveCalls\Lib;
 
 
+use MikoPBX\Common\Models\PbxExtensionModules;
 use MikoPBX\Core\System\Processes;
-use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\PbxExtensionBase;
 use MikoPBX\Modules\PbxExtensionUtils;
@@ -75,5 +75,16 @@ class MonitorActiveCallsMain extends PbxExtensionBase
                 }
             }
         }
+    }
+
+
+    /**
+     * Checks whether the ModuleSoftphoneBackend module exists and is enabled..
+     * @return bool
+     */
+    public static function backendExists(): bool
+    {
+        $result = PbxExtensionModules::findFirstByUniqid("ModuleSoftphoneBackend");
+        return $result !== null && intval($result->disabled ) === 0;
     }
 }

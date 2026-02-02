@@ -9,7 +9,7 @@ namespace Modules\ModuleMonitorActiveCalls\App\Controllers;
 use MikoPBX\AdminCabinet\Controllers\BaseController;
 use MikoPBX\AdminCabinet\Controllers\SessionController;
 use MikoPBX\Common\Models\Extensions;
-use MikoPBX\Common\Models\Users;
+use MikoPBX\Common\Models\PbxExtensionModules;
 use MikoPBX\Common\Providers\PBXConfModulesProvider;
 use MikoPBX\Common\Providers\SessionProvider;
 use MikoPBX\Modules\Config\CDRConfigInterface;
@@ -17,12 +17,13 @@ use MikoPBX\Modules\PbxExtensionUtils;
 use Modules\ModuleMonitorActiveCalls\App\Forms\ModuleMonitorActiveCallsForm;
 use Modules\ModuleMonitorActiveCalls\bin\WorkerAmiActions;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
 use Modules\ModuleMonitorActiveCalls\Models\ModuleMonitorActiveCalls;
 use Modules\ModuleMonitorActiveCalls\Models\UsersSettings;
 use Modules\ModuleUsersUI\Lib\Constants;
 use Modules\ModuleUsersUI\Models\AccessGroups;
 use Modules\ModuleUsersUI\Models\UsersCredentials;
-use DateTime;
+use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController as ModuleSoftphoneBackendApi;
 
 class ModuleMonitorActiveCallsController extends BaseController
 {
@@ -56,6 +57,7 @@ class ModuleMonitorActiveCallsController extends BaseController
         $headerCollectionCSS->addCss("css/cache/$this->moduleUniqueID/module-monitor-active-calls.css", true);
         $headerCollectionCSS->addCss('css/vendor/datatable/dataTables.semanticui.min.css', true);
         $headerCollectionCSS->addCss('css/vendor/semantic/comment.css', true);
+        $headerCollectionCSS->addCss('css/vendor/semantic/card.css', true);
         $headerCollectionCSS->addCss('css/vendor/semantic/list.css', true);
 
         $this->view->form = new ModuleMonitorActiveCallsForm();
@@ -76,24 +78,35 @@ class ModuleMonitorActiveCallsController extends BaseController
             $user['username'] = "$user[callerid] <$user[number]>";
         }
         $this->view->usersArray = $users;
+
         $this->view->userRestrictions = implode(',', $userRestrictions);
 
         $this->view->userId = $userId;
         $this->view->userNumber = $userNumber;
         $this->view->cid = $cid;
-        $this->view->queueId = '';
+        $this->view->queueIds = [];
 
-        $settings = UsersSettings::findFirst([
-            'userId=:userId: AND key=:key:',
+        $settings = UsersSettings::find([
+            'userId=:userId:',
             'bind' => [
-                'userId' => $userId,
-                'key' => 'queueId'
+                'userId' => (string)$userId,
             ]
         ]);
-        if($settings){
-            $this->view->queueId  = $settings->value;
+        $minWaitVisible = 0;
+        foreach ($settings as $setting){
+            if('queueIds' === $setting->key ){
+                $decoded = json_decode($setting->value, true);
+                $this->view->queueIds = is_array($decoded) ? $decoded : [];
+            }elseif ('minWaitVisible' === $setting->key ){
+                $minWaitVisible = intval($setting->value);
+            }
         }
-
+        $minWaitVisibleVariants = [];
+        foreach ([0,10,20,30,40,50,60] as $value){
+            $minWaitVisibleVariants[] = ['id' => $value, 'active' => $minWaitVisible === $value, 'name' => $value];
+        }
+        $this->view->minWaitVisible = $minWaitVisibleVariants;
+        $this->view->minWaitVisibleValue  = $minWaitVisible;
     }
 
     /**
@@ -136,6 +149,20 @@ class ModuleMonitorActiveCallsController extends BaseController
         $this->view->data = $data;
     }
 
+    public function backandEnableAction() :void
+    {
+        if (MonitorActiveCallsMain::backendExists()) {
+            // Модуль включен.
+            $api = new ModuleSoftphoneBackendApi();
+            $api->initialize();
+            $this->view->data = $api->createLoginResponse('1', 'admin');
+            $this->view->success = true;
+        }else{
+            $this->view->success = false;
+            $this->view->data = [];
+        }
+    }
+
     public function saveUserAction():void
     {
         $data       = $this->request->getPost();
@@ -147,9 +174,27 @@ class ModuleMonitorActiveCallsController extends BaseController
             }
             $settings->adminUserId = $data['adminUserId']??'';
             $this->view->success = $settings->save();
-        }elseif (isset($data['queueId']) ){
+        }elseif (isset($data['minWaitVisible']) ){
             [,,$userId,] = $this->getUserData();
-            $key = 'queueId';
+            $key = 'minWaitVisible';
+            $settings = UsersSettings::findFirst([
+                 'userId=:userId: AND key=:key:',
+                 'bind' => [
+                     'userId' => $userId,
+                     'key' => $key
+                 ]
+            ]);
+            if(!$settings){
+                $settings = new UsersSettings();
+                $settings->userId = $userId;
+                $settings->key = $key;
+            }
+            $settings->value = $data['minWaitVisible']??'';
+            $this->view->success = $settings->save();
+        }elseif (isset($data['queueIds']) ){
+            [,,$userId,] = $this->getUserData();
+            $userId = (string)$userId;
+            $key = 'queueIds';
             $settings = UsersSettings::findFirst([
                 'userId=:userId: AND key=:key:',
                 'bind' => [
@@ -162,7 +207,13 @@ class ModuleMonitorActiveCallsController extends BaseController
                 $settings->userId = $userId;
                 $settings->key = $key;
             }
-            $settings->value = $data['queueId']??'';
+            // Принимаем массив или JSON-строку
+            $queueIds = $data['queueIds'];
+            if (is_string($queueIds)) {
+                $decoded = json_decode($queueIds, true);
+                $queueIds = is_array($decoded) ? $decoded : [];
+            }
+            $settings->value = json_encode(is_array($queueIds) ? $queueIds : []);
             $this->view->success = $settings->save();
         }
         $this->view->data = $data;

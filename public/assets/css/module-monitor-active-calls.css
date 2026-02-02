@@ -13,3 +13,66 @@
 .ui.table tbody tr.row-offline   > td { background-color:#f5f5f5 !important; color:rgba(0,0,0,.45); }
 .ui.table tbody tr.row-pause > td { background-color: #fff3e0 !important; color: rgba(0, 0, 0, 0.6) !important;
 }
+
+/* Agents tiles (cards) */
+.ui.cards.agent-cards {
+  margin-top: 0 !important;
+}
+.ui.cards.agent-cards > .ui.card.agent-card {
+  width: 240px;
+  border: 1px solid rgba(34, 36, 38, 0.15);
+  box-shadow: none;
+  margin: 0.5em !important;
+}
+.ui.cards.agent-cards > .ui.card.agent-card > .content {
+  padding: 0.6em 0.7em;
+}
+.ui.card.agent-card .agent-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  white-space: nowrap;
+}
+.ui.card.agent-card .content > .header.agent-card-header {
+  font-size: inherit !important;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.ui.card.agent-card .content > .meta.agent-peer {
+  font-size: inherit !important;
+}
+.ui.card.agent-card .agent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ui.basic.label.agent-num-label {
+  border: none !important;
+  box-shadow: none !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  padding: 0.15em 0.45em !important;
+}
+.ui.card.agent-card .agent-peer {
+  margin-top: 0.35em;
+  line-height: 1.2;
+}
+.ui.card.agent-card .peer-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  white-space: nowrap;
+}
+.ui.card.agent-card .agent-phone {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.ui.card.agent-card .peer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status highlight for cards (same palette as table rows) */
+.ui.card.agent-card.row-available { background-color:#e8f5e9 !important; border-color: rgba(33, 186, 69, 0.35) !important; }
+.ui.card.agent-card.row-in-call   { background-color:#e8f0fe !important; border-color: rgba(33, 133, 208, 0.35) !important; }
+.ui.card.agent-card.row-dialing   { background-color: rgba(246, 229, 251, 0.65) !important; border-color: rgba(224, 57, 151, 0.25) !important; }
+.ui.card.agent-card.row-offline   { background-color:#f5f5f5 !important; border-color: rgba(0,0,0,0.12) !important; color:rgba(0,0,0,.55); }

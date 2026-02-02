@@ -20,19 +20,26 @@
 namespace Modules\ModuleMonitorActiveCalls\bin;
 require_once 'Globals.php';
 
+use MikoPBX\Common\Models\PbxSettings;
 use MikoPBX\Core\Asterisk\AsteriskManager;
 use MikoPBX\Core\System\BeanstalkClient;
 use MikoPBX\Core\System\SystemMessages;
 use MikoPBX\Core\System\Util;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleMonitorActiveCalls\Lib\AsteriskManager as CustomAsteriskManager;
+use Modules\ModuleMonitorActiveCalls\Lib\Logger;
 use Modules\ModuleMonitorActiveCalls\Lib\MikoPBXVersion;
+use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 
 class WorkerAmiActions extends WorkerBase
 {
+    public Logger $logger;
+
     public int $countReq = 0;
     public float $counterStartTime = 0;
-    protected AsteriskManager $am;
+    protected CustomAsteriskManager $amCustom;
+
 
     /**
      * Handles the received signal.
@@ -45,6 +52,25 @@ class WorkerAmiActions extends WorkerBase
     {
         parent::signalHandler($signal);
         cli_set_process_title('SHUTDOWN_'.cli_get_process_title());
+        $this->needRestart = true;
+        $this->logger->writeInfo('signalHandler...'.$signal);
+    }
+
+
+    /**
+     * Подключение к AMI.
+     * @param string $events
+     * @return CustomAsteriskManager
+     */
+    public function getAstManager(string $events = 'on'):CustomAsteriskManager
+    {
+        $am     = new CustomAsteriskManager();
+        $port   = PbxSettings::getValueByKey('AMIPort');
+        $result = $am->connect("127.0.0.1:$port", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER, $events);
+        if(!$result){
+            $this->logger->writeError('Fail connect AMI...');
+        }
+        return $am;
     }
 
     /**
@@ -54,13 +80,16 @@ class WorkerAmiActions extends WorkerBase
      */
     public function start($argv):void
     {
-        $this->am = Util::getAstManager();
+        $this->logger = new Logger('AmiActions', 'ModuleMonitorActiveCalls');
+        $this->logger->writeInfo('Starting...');
+        $this->amCustom = $this->getAstManager();
         $beanstalk      = new BeanstalkClient(self::class);
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
         while ($this->needRestart === false) {
             $beanstalk->wait();
         }
+        $this->amCustom->disconnect();
     }
 
     /**
@@ -75,6 +104,7 @@ class WorkerAmiActions extends WorkerBase
         }catch (\Throwable $e){
             return;
         }
+        $this->logger->writeInfo($data, 'Events...');
         $res_data = '';
         $funcName = $data['function']??'';
         if(method_exists($this, $funcName)){
@@ -83,8 +113,10 @@ class WorkerAmiActions extends WorkerBase
             }else{
                 $res_data = $this->$funcName(...$data['args']??[]);
             }
-            $res_data = serialize($res_data);
-            $res_data = $this->saveResultInTmpFile($res_data);
+            $this->logger->writeInfo($res_data, 'Result...');
+            $res_data = $this->saveResultInTmpFile(serialize($res_data));
+        }else{
+            $this->logger->writeError('method not exists...');
         }
         $tube->reply($res_data);
     }
@@ -98,6 +130,9 @@ class WorkerAmiActions extends WorkerBase
      */
     public function restAPICallback(array $request): PBXApiResult
     {
+        $this->amCustom->disconnect();
+        $this->amCustom = $this->getAstManager();
+
         $res    = new PBXApiResult();
         $res->processor = __METHOD__;
         $action = strtolower($request['action']);
@@ -115,36 +150,36 @@ class WorkerAmiActions extends WorkerBase
 
         if('join' === $action) {
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $request['data']['number'], $variable);
-
+            $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qBS'");
         }elseif ('whisper' === $action){
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $request['data']['number'], $variable);
-
+            $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qw'");
         }elseif ('listen' === $action){
             $res->success = true;
-            $am = Util::getAstManager('off');
             $variable    = "pt1c_cid=SPY-{$request['data']['number']},ALLOW_MULTY_ANSWER=1";
             $channel     = "Local/{$request['data']['number']}@internal-originate";
-            $am->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $request['data']['number'], $variable);
-
+            $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $request['data']['number'], $variable);
             SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$request['data']['number']} to $actionChannel. mode 'qoS'");
         }elseif ('hangup' === $action){
-            $am = Util::getAstManager('off');
-            $am->Hangup($request['data']['ch1']??'');
+            $this->amCustom->Hangup($request['data']['ch1']??'');
         }else{
             $res->success    = false;
             $res->messages[] = 'API action not found in moduleRestAPICallback ModuleMonitorActiveCalls '.$action;
         }
         return $res;
+    }
+
+    public function getChannels()
+    {
+        $this->amCustom->disconnect();
+        $this->amCustom = $this->getAstManager();
+        return $this->amCustom->getChannels();
     }
 
     /**
@@ -195,9 +230,10 @@ class WorkerAmiActions extends WorkerBase
      * Метод следует вызывать при работе с API из прочих процессов.
      * @param $function
      * @param $args
+     * @param int $timeout
      * @return mixed|PBXApiResult
      */
-    public static function invokeApi($function, $args)
+    public static function invokeApi($function, $args, int $timeout = 20)
     {
         $req = [
             'function' => $function,
@@ -205,7 +241,7 @@ class WorkerAmiActions extends WorkerBase
         ];
         $client = new BeanstalkClient(self::class);
         try {
-            $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), 20);
+            $result = $client->request(json_encode($req, JSON_THROW_ON_ERROR), $timeout);
             if(file_exists($result)){
                 $filename = $result;
                 $result = json_decode(file_get_contents($result), true, 512, JSON_THROW_ON_ERROR);

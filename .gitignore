@@ -1,0 +1,12 @@
+# IDE
+.idea/
+
+# Claude Code
+CLAUDE.md
+tasks.md
+
+# Dependencies
+/vendor/
+
+# Logs
+*.log
