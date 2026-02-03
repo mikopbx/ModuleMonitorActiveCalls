@@ -457,33 +457,11 @@ class WorkerActiveCalls extends WorkerBase
     {
         $states = $this->states;
 
-        // Строим карту channel -> [linkedId, connectedChannel, connectedNumber]
-        $channelConnections = [];
-        foreach ($this->activeBridges as $linkedId => $bridges) {
-            foreach ($bridges as $bridgeChannels) {
-                $channelList = array_keys($bridgeChannels);
-                if (count($channelList) !== 2) {
-                    continue;
-                }
-                $ch1 = $channelList[0];
-                $ch2 = $channelList[1];
-                $num1 = $this->activeChannels[$linkedId][$ch1]['CallerIDNum'] ?? '';
-                $num2 = $this->activeChannels[$linkedId][$ch2]['CallerIDNum'] ?? '';
-
-                $channelConnections[$ch1] = ['channel' => $ch2, 'number' => $num2];
-                $channelConnections[$ch2] = ['channel' => $ch1, 'number' => $num1];
-            }
-        }
-
-        // Строим карту channel -> ConnectedLineNum из activeChannels
-        $channelToConnectedLine = [];
+        // Строим карту channel -> linkedId
+        $channelToLinkedId = [];
         foreach ($this->activeChannels as $linkedId => $channels) {
-            foreach ($channels as $channel => $data) {
-                $connectedNum = $data['ConnectedLineNum'] ?? '';
-                // Фильтруем <unknown> и подобные значения
-                if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
-                    $channelToConnectedLine[$channel] = $connectedNum;
-                }
+            foreach (array_keys($channels) as $channel) {
+                $channelToLinkedId[$channel] = $linkedId;
             }
         }
 
@@ -494,12 +472,28 @@ class WorkerActiveCalls extends WorkerBase
             }
             $enrichedChannels = [];
             foreach (array_keys($stateData['channels']) as $channel) {
-                if (isset($channelConnections[$channel])) {
-                    $enrichedChannels[$channel] = $channelConnections[$channel];
+                $linkedId = $channelToLinkedId[$channel] ?? '';
+                if (empty($linkedId)) {
+                    $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                    continue;
+                }
+
+                // Проходим цепочку бриджей через Local-каналы до реального PJSIP-канала
+                $resolvedChannel = $channel;
+                $bridgeStart = time();
+                $found = $this->findBridgeChannel($linkedId, $resolvedChannel, $bridgeStart);
+
+                if ($found && $resolvedChannel !== $channel) {
+                    $number = $this->activeChannels[$linkedId][$resolvedChannel]['CallerIDNum'] ?? '';
+                    $enrichedChannels[$channel] = ['channel' => $resolvedChannel, 'number' => $number];
                 } else {
-                    // Канал не в бридже (звонит/ожидает) - используем ConnectedLineNum
-                    $connectedNum = $channelToConnectedLine[$channel] ?? '';
-                    $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum];
+                    // Канал не в бридже (звонит/ожидает) — используем ConnectedLineNum
+                    $connectedNum = $this->activeChannels[$linkedId][$channel]['ConnectedLineNum'] ?? '';
+                    if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum];
+                    } else {
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                    }
                 }
             }
             $stateData['channels'] = $enrichedChannels;
