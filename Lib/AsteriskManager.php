@@ -93,6 +93,15 @@ class AsteriskManager
      */
     private bool $_loggedIn = false;
 
+    /** @var callable|null Callback invoked periodically when AMI connection is alive and idle */
+    private $onIdleCallback = null;
+
+    /** @var int Timestamp of last idle callback invocation */
+    private int $lastIdleCall = 0;
+
+    /** @var int Minimum interval between idle callback calls (seconds) */
+    private int $idleInterval = 30;
+
     /**
      * Constructor
      *
@@ -559,6 +568,19 @@ class AsteriskManager
      *
      * @return array of parameters, empty on timeout
      */
+    public function setOnIdleCallback(callable $callback, int $interval = 30): void
+    {
+        $this->onIdleCallback = $callback;
+        $this->idleInterval = $interval;
+    }
+
+    /**
+     * Wait for a user events.
+     *
+     * @param $allow_timeout bool
+     *
+     * @return array of parameters, empty on timeout
+     */
     public function waitUserEvent(bool $allow_timeout = false): array
     {
         $timeout = false;
@@ -578,6 +600,11 @@ class AsteriskManager
             }
             if ($type === '' && count($this->ping()) === 0) {
                 $timeout = $allow_timeout;
+            } elseif ($type === '' && $this->onIdleCallback !== null
+                && time() - $this->lastIdleCall >= $this->idleInterval
+            ) {
+                $this->lastIdleCall = time();
+                call_user_func($this->onIdleCallback);
             } elseif (stripos($type, 'event') !== false) {
                 $this->processEvent($parameters);
             }

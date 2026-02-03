@@ -41,7 +41,7 @@ class MonitorActiveCallsConf extends ConfigClass
                 'worker' => WorkerAmiActions::class,
             ],
             [
-                'type'   => WorkerSafeScriptsCore::CHECK_BY_AMI,
+                'type'   => WorkerSafeScriptsCore::CHECK_BY_PID_NOT_ALERT,
                 'worker' => WorkerActiveCalls::class,
             ],
         ];

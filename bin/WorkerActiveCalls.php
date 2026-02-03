@@ -102,6 +102,8 @@ class WorkerActiveCalls extends WorkerBase
     private const MAX_BRIDGE_ITERATIONS = 200;
     private const AMI_REQUEST_TIMEOUT = 200000;
 
+    public const STATE_FILE = '/tmp/MonitorActiveCalls_worker.state';
+
     private array $queueEntryes = [];
 
     /**
@@ -128,6 +130,21 @@ class WorkerActiveCalls extends WorkerBase
 
 
         return false;
+    }
+
+    /**
+     * Обновляет state-файл с текущим статусом воркера.
+     * Используется safe.php для контроля здоровья процесса.
+     *
+     * @param string $status 'starting' или 'running'
+     */
+    public static function updateStateFile(string $status = 'running'): void
+    {
+        file_put_contents(self::STATE_FILE, json_encode([
+            'pid' => getmypid(),
+            'ts' => time(),
+            'status' => $status,
+        ]));
     }
 
     /**
@@ -221,6 +238,7 @@ class WorkerActiveCalls extends WorkerBase
     {
         $this->logger = new Logger('ActiveCalls', 'ModuleMonitorActiveCalls');
         $this->logger->writeInfo('Starting...');
+        self::updateStateFile('starting');
 
         $this->backendExists = MonitorActiveCallsMain::backendExists();
         $this->initManagerAsterisk();
@@ -233,7 +251,11 @@ class WorkerActiveCalls extends WorkerBase
 
         $this->init = false;
         $this->printActiveCalls();
+        self::updateStateFile('running');
         $this->logger->writeInfo('Wait events...');
+        $this->amCustom->setOnIdleCallback(function () {
+            self::updateStateFile('running');
+        }, 30);
         while ($this->needRestart === false) {
             try {
                 $this->amCustom->waitUserEvent(true);
@@ -241,6 +263,9 @@ class WorkerActiveCalls extends WorkerBase
                     sleep(1);
                     $this->logger->writeInfo('initManagerAsterisk...');
                     $this->initManagerAsterisk();
+                    $this->amCustom->setOnIdleCallback(function () {
+                        self::updateStateFile('running');
+                    }, 30);
                 }
             } catch (\Throwable $e) {
                 $this->logger->writeError("Error in main loop: " . $e->getMessage());
