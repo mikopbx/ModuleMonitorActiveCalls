@@ -234,7 +234,7 @@ class WorkerActiveCalls extends WorkerBase
         $this->init = false;
         $this->printActiveCalls();
         $this->logger->writeInfo('Wait events...');
-        while (true) {
+        while ($this->needRestart === false) {
             try {
                 $this->amCustom->waitUserEvent(true);
                 if (!$this->amCustom->loggedIn()) {
@@ -687,6 +687,27 @@ class WorkerActiveCalls extends WorkerBase
 
                 $did = $this->amCustom->GetVar($channel, 'FROM_DID','', false);
                 if(!isset($this->callType[$linkedId])){
+                    if($chanData['Type'] === self::ENDPOINT_TYPE_PROVIDER){
+                        $callType = self::CALL_TYPE_IN;
+                    }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && !empty($did)){
+                        $callType = '';
+                    }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && empty($did)){
+                        $callType = self::CALL_TYPE_OUT;
+                    }else{
+                        $callType = self::CALL_TYPE_INNER;
+                    }
+                    if(!empty($callType)){
+                        $this->callType[$linkedId] = [
+                            'type'     => $callType,
+                            'src_chan' => $channel,
+                            'did'      => $did,
+                            'time'     => str_replace('mikopbx-','',$chanData['Uniqueid']),
+                            'answer'   => strtotime($this->amCustom->GetVar($channel, 'CDR(answer)','', false))
+                        ];
+                    }
+                } elseif ($chanData['Uniqueid'] === $linkedId) {
+                    // Этот канал — инициатор звонка (Uniqueid == Linkedid).
+                    // Переопределяем src_chan, т.к. порядок обхода каналов не гарантирован.
                     if($chanData['Type'] === self::ENDPOINT_TYPE_PROVIDER){
                         $callType = self::CALL_TYPE_IN;
                     }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && !empty($did)){
