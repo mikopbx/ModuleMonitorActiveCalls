@@ -482,6 +482,42 @@ class WorkerActiveCalls extends WorkerBase
     {
         $states = $this->states;
 
+        // Обновляем состояние очередей на основе состояния агентов
+        foreach ($this->queuesData as $queueId => $queueData) {
+            $queueNumber = $queueData['number'] ?? '';
+            if (empty($queueNumber) || !isset($states[$queueNumber])) {
+                continue;
+            }
+
+            $hasIdleAgent = false;
+            $hasAvailableAgent = false;
+
+            foreach ($queueData['agents'] as $agentNumber) {
+                $agentState = '';
+                if (isset($this->states[$agentNumber])) {
+                    $agentState = $this->states[$agentNumber]['state'];
+                } elseif (isset($this->mobileStates[$agentNumber])) {
+                    $agentState = $this->mobileStates[$agentNumber]['state'];
+                }
+
+                if ($agentState === self::STATE_IDLE) {
+                    $hasIdleAgent = true;
+                    $hasAvailableAgent = true;
+                    break;
+                } elseif ($agentState !== self::STATE_UNAVAILABLE) {
+                    $hasAvailableAgent = true;
+                }
+            }
+
+            if ($hasIdleAgent) {
+                $states[$queueNumber]['state'] = self::STATE_IDLE;
+            } elseif ($hasAvailableAgent) {
+                $states[$queueNumber]['state'] = self::STATE_BUSY;
+            } else {
+                $states[$queueNumber]['state'] = self::STATE_UNAVAILABLE;
+            }
+        }
+
         // Строим карту channel -> linkedId
         $channelToLinkedId = [];
         foreach ($this->activeChannels as $linkedId => $channels) {
@@ -499,9 +535,13 @@ class WorkerActiveCalls extends WorkerBase
             foreach (array_keys($stateData['channels']) as $channel) {
                 $linkedId = $channelToLinkedId[$channel] ?? '';
                 if (empty($linkedId)) {
-                    $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                    $enrichedChannels[$channel] = ['channel' => '', 'number' => '', 'direction' => ''];
                     continue;
                 }
+
+                // Определяем направление звонка относительно владельца канала
+                $srcChan = $this->callType[$linkedId]['src_chan'] ?? '';
+                $direction = ($channel === $srcChan) ? 'outgoing' : 'incoming';
 
                 // Проходим цепочку бриджей через Local-каналы до реального PJSIP-канала
                 $resolvedChannel = $channel;
@@ -510,14 +550,14 @@ class WorkerActiveCalls extends WorkerBase
 
                 if ($found && $resolvedChannel !== $channel) {
                     $number = $this->activeChannels[$linkedId][$resolvedChannel]['CallerIDNum'] ?? '';
-                    $enrichedChannels[$channel] = ['channel' => $resolvedChannel, 'number' => $number];
+                    $enrichedChannels[$channel] = ['channel' => $resolvedChannel, 'number' => $number, 'direction' => $direction];
                 } else {
                     // Канал не в бридже (звонит/ожидает) — используем ConnectedLineNum
                     $connectedNum = $this->activeChannels[$linkedId][$channel]['ConnectedLineNum'] ?? '';
                     if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
-                        $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum];
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum, 'direction' => $direction];
                     } else {
-                        $enrichedChannels[$channel] = ['channel' => '', 'number' => ''];
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => '', 'direction' => $direction];
                     }
                 }
             }
@@ -643,6 +683,14 @@ class WorkerActiveCalls extends WorkerBase
         foreach ($queues as $queue){
             $this->queuesData[$queue->id] = $queue->toArray();
             $this->queuesData[$queue->id]['agents'] = [];
+
+            // Добавляем очередь в states
+            $this->states[$queue->number] = [
+                'state' => self::STATE_UNAVAILABLE,
+                'name' => $queue->name,
+                'channels' => [],
+                'isQueue' => true
+            ];
         }
         $queuesAgents = CallQueueMembers::find(['columns' => 'queue,extension']);
         foreach ($queuesAgents as $queuesAgent) {
@@ -1166,7 +1214,7 @@ class WorkerActiveCalls extends WorkerBase
         }
         if($event === 'ExtensionStatus'){
             $exten = $parameters['Exten'] ?? '';
-            if(!empty($exten) && isset($this->states[$exten])){
+            if(!empty($exten) && isset($this->states[$exten]) && empty($this->states[$exten]['isQueue'])){
                 $this->states[$exten]['state'] = $parameters['StatusText'] ?? '';
                 $this->logger->writeInfo($parameters,'stateEvents...');
                 $this->printActiveCalls();
