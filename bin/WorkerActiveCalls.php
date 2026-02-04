@@ -981,11 +981,24 @@ class WorkerActiveCalls extends WorkerBase
                 return;
             }
             $endpoint = self::getEndpointName($channel);
-            unset($this->activeChannels[$linkedId][$channel]);
+
+            // Попытка удалить канал из указанного linkedId
+            $foundLinkedId = $linkedId;
+            if (!isset($this->activeChannels[$linkedId][$channel])) {
+                // Linkedid мог измениться (attended transfer, masquerade) — ищем канал во всех linkedId
+                foreach (array_keys($this->activeChannels) as $altLinkedId) {
+                    if (isset($this->activeChannels[$altLinkedId][$channel])) {
+                        $foundLinkedId = $altLinkedId;
+                        break;
+                    }
+                }
+            }
+
+            unset($this->activeChannels[$foundLinkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
-            if(empty($this->activeChannels[$linkedId])){
-                unset($this->activeChannels[$linkedId]);
-                unset($this->callType[$linkedId]);
+            if(empty($this->activeChannels[$foundLinkedId])){
+                unset($this->activeChannels[$foundLinkedId]);
+                unset($this->callType[$foundLinkedId]);
             }
         }elseif(in_array($event, ['Newchannel','Newstate']) && stripos($parameters['Channel'] ?? '', 'local') === false){
             $linkedId = $parameters['Linkedid'] ?? '';
