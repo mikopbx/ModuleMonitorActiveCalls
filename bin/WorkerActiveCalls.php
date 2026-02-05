@@ -1060,8 +1060,25 @@ class WorkerActiveCalls extends WorkerBase
                 }
             }
 
+            // Проверяем, был ли удалённый канал src_chan (параллельный вызов на несколько устройств)
+            $wasSrcChan = isset($this->callType[$foundLinkedId]) &&
+                          ($this->callType[$foundLinkedId]['src_chan'] ?? '') === $channel;
+
             unset($this->activeChannels[$foundLinkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
+
+            // Если удалённый канал был src_chan, ищем альтернативный канал с тем же endpoint
+            if ($wasSrcChan && !empty($this->activeChannels[$foundLinkedId])) {
+                foreach ($this->activeChannels[$foundLinkedId] as $altChannel => $altChanData) {
+                    if (self::getEndpointName($altChannel) === $endpoint) {
+                        // Нашли активный канал с тем же endpoint — обновляем src_chan
+                        $this->callType[$foundLinkedId]['src_chan'] = $altChannel;
+                        $this->logger->writeInfo("Updated src_chan from $channel to $altChannel for linkedId $foundLinkedId (parallel dial)");
+                        break;
+                    }
+                }
+            }
+
             if(empty($this->activeChannels[$foundLinkedId])){
                 unset($this->activeChannels[$foundLinkedId]);
                 unset($this->callType[$foundLinkedId]);
