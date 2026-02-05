@@ -562,6 +562,21 @@ class AsteriskManager
     }
 
     /**
+     * Sets socket read timeout.
+     *
+     * @param int $seconds Timeout in seconds
+     * @param int $microseconds Timeout in microseconds (optional)
+     * @return bool True if socket is valid and timeout was set
+     */
+    public function setSocketTimeout(int $seconds, int $microseconds = 0): bool
+    {
+        if ($this->socket === false) {
+            return false;
+        }
+        return stream_set_timeout($this->socket, $seconds, $microseconds);
+    }
+
+    /**
      * Wait for a user events.
      *
      * @param $allow_timeout bool

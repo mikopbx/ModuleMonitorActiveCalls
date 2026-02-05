@@ -1002,6 +1002,8 @@ class WorkerActiveCalls extends WorkerBase
         $this->amCustom = new CustomAsteriskManager();
         // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
         $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
+        // Устанавливаем короткий timeout для быстрой отработки idle callback и отправки WebSocket updates
+        $this->amCustom->setSocketTimeout(1);
 
         $pingTube = $this->makePingTubeName(self::class);
         $params = ['Operation' => 'Add', 'Filter' => 'UserEvent: '.$pingTube];
