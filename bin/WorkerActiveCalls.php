@@ -53,6 +53,11 @@ class WorkerActiveCalls extends WorkerBase
     private array $spyerChannels = [];
     private array $agentToQueues = []; // agent number => [queueIds]
 
+    // Throttling WebSocket updates
+    private int $stateUpdateScheduled = 0;      // timestamp первого изменения (ms)
+    private float $lastStateUpdateSent = 0.0;   // timestamp последней отправки (ms)
+    private $pendingUserStatesData = null;      // накопленные изменения
+
     public const ENDPOINT_TYPE_PEER = '1';
     public const ENDPOINT_TYPE_PROVIDER = '2';
     public const STATE_IDLE         = 'Idle';
@@ -101,6 +106,7 @@ class WorkerActiveCalls extends WorkerBase
     private const CONTROL_INTERVAL = 60;
     private const MAX_BRIDGE_ITERATIONS = 200;
     private const AMI_REQUEST_TIMEOUT = 200000;
+    private const STATE_UPDATE_DELAY = 200; // ms - задержка debounce для WebSocket обновлений
 
     public const STATE_FILE = '/tmp/MonitorActiveCalls_worker.state';
 
@@ -462,12 +468,45 @@ class WorkerActiveCalls extends WorkerBase
         $data = ['states' => $enrichedStates];
         $dataPrint = json_encode($data, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
+
+        $now = (int)(microtime(true) * 1000); // текущее время в миллисекундах
+
+        // Если состояние изменилось
         if($newPrintHash <> $this->lastPrintUserHash){
             $this->lastPrintUserHash = $newPrintHash;
-            CacheManager::setCacheData('getUsersStates', $data, self::CACHE_TTL);
-            if($this->backendExists){
-                BackendApiController::publishUserStates($data);
+            $this->pendingUserStatesData = $data;
+
+            // Планируем отправку, если ещё не запланирована
+            if($this->stateUpdateScheduled === 0) {
+                $this->stateUpdateScheduled = $now;
+                $this->logger->writeInfo("WS throttle: State change detected, scheduled update");
+            } else {
+                $timeSinceScheduled = $now - $this->stateUpdateScheduled;
+                $this->logger->writeInfo("WS throttle: State changed again, pending send in {$timeSinceScheduled}ms");
             }
+        }
+
+        // Проверяем, пора ли отправлять накопленные изменения
+        if($this->stateUpdateScheduled > 0 &&
+           ($now - $this->stateUpdateScheduled) >= self::STATE_UPDATE_DELAY) {
+
+            if($this->pendingUserStatesData !== null) {
+                $delayMs = $now - $this->stateUpdateScheduled;
+                $timeSinceLastSent = $this->lastStateUpdateSent > 0 ? $now - $this->lastStateUpdateSent : 0;
+                $payloadSize = strlen($dataPrint);
+
+                $this->logger->writeInfo("WS throttle: Sending update after {$delayMs}ms delay, " .
+                    "payload: {$payloadSize} bytes, " .
+                    "time since last: {$timeSinceLastSent}ms");
+
+                CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
+                if($this->backendExists){
+                    BackendApiController::publishUserStates($this->pendingUserStatesData);
+                }
+                $this->lastStateUpdateSent = $now;
+                $this->pendingUserStatesData = null;
+            }
+            $this->stateUpdateScheduled = 0;
         }
 
     }
@@ -529,6 +568,7 @@ class WorkerActiveCalls extends WorkerBase
         // Обновляем channels в копии states
         foreach ($states as $endpoint => &$stateData) {
             if (empty($stateData['channels'])) {
+                unset($stateData['channels']); // Удаляем пустой ключ для экономии трафика
                 continue;
             }
             $enrichedChannels = [];
@@ -561,7 +601,12 @@ class WorkerActiveCalls extends WorkerBase
                     }
                 }
             }
-            $stateData['channels'] = $enrichedChannels;
+            // Добавляем channels только если есть данные
+            if (!empty($enrichedChannels)) {
+                $stateData['channels'] = $enrichedChannels;
+            } else {
+                unset($stateData['channels']); // Удаляем если обогащение не дало результата
+            }
         }
         unset($stateData);
 
