@@ -261,7 +261,8 @@ class WorkerActiveCalls extends WorkerBase
         $this->logger->writeInfo('Wait events...');
         $this->amCustom->setOnIdleCallback(function () {
             self::updateStateFile('running');
-        }, 30);
+            $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+        }, 1); // Проверка каждую секунду для быстрой отправки WS updates
         while ($this->needRestart === false) {
             try {
                 $this->amCustom->waitUserEvent(true);
@@ -271,7 +272,8 @@ class WorkerActiveCalls extends WorkerBase
                     $this->initManagerAsterisk();
                     $this->amCustom->setOnIdleCallback(function () {
                         self::updateStateFile('running');
-                    }, 30);
+                        $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+                    }, 1); // Проверка каждую секунду для быстрой отправки WS updates
                 }
             } catch (\Throwable $e) {
                 $this->logger->writeError("Error in main loop: " . $e->getMessage());
@@ -487,28 +489,44 @@ class WorkerActiveCalls extends WorkerBase
         }
 
         // Проверяем, пора ли отправлять накопленные изменения
-        if($this->stateUpdateScheduled > 0 &&
-           ($now - $this->stateUpdateScheduled) >= self::STATE_UPDATE_DELAY) {
+        $this->flushPendingStateUpdate();
 
-            if($this->pendingUserStatesData !== null) {
-                $delayMs = $now - $this->stateUpdateScheduled;
-                $timeSinceLastSent = $this->lastStateUpdateSent > 0 ? $now - $this->lastStateUpdateSent : 0;
-                $payloadSize = strlen($dataPrint);
+    }
 
-                $this->logger->writeInfo("WS throttle: Sending update after {$delayMs}ms delay, " .
-                    "payload: {$payloadSize} bytes, " .
-                    "time since last: {$timeSinceLastSent}ms");
-
-                CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
-                if($this->backendExists){
-                    BackendApiController::publishUserStates($this->pendingUserStatesData);
-                }
-                $this->lastStateUpdateSent = $now;
-                $this->pendingUserStatesData = null;
-            }
-            $this->stateUpdateScheduled = 0;
+    /**
+     * Отправляет накопленные обновления getUsersStates, если прошло достаточно времени.
+     * Может вызываться из scheduleUserStatesUpdate() и из idle callback.
+     */
+    private function flushPendingStateUpdate(): void
+    {
+        if ($this->stateUpdateScheduled === 0) {
+            return; // Нет запланированных обновлений
         }
 
+        $now = (int)(microtime(true) * 1000);
+        $elapsed = $now - $this->stateUpdateScheduled;
+
+        if ($elapsed < self::STATE_UPDATE_DELAY) {
+            return; // Ещё рано отправлять
+        }
+
+        // Пора отправлять
+        if ($this->pendingUserStatesData !== null) {
+            $timeSinceLastSent = $this->lastStateUpdateSent > 0 ? $now - $this->lastStateUpdateSent : 0;
+            $payloadSize = strlen(json_encode($this->pendingUserStatesData, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
+
+            $this->logger->writeInfo("WS throttle: Sending update after {$elapsed}ms delay, " .
+                "payload: {$payloadSize} bytes, " .
+                "time since last: {$timeSinceLastSent}ms");
+
+            CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
+            if ($this->backendExists) {
+                BackendApiController::publishUserStates($this->pendingUserStatesData);
+            }
+            $this->lastStateUpdateSent = $now;
+            $this->pendingUserStatesData = null;
+        }
+        $this->stateUpdateScheduled = 0;
     }
 
     /**
