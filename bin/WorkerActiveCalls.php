@@ -56,6 +56,7 @@ class WorkerActiveCalls extends WorkerBase
     // Call pickup tracking
     private array $pickupChannels = [];    // channel => ['target_extension' => ..., 'initial_linkedid' => ..., 'pickup_time' => ...]
     private array $channelLinkedIds = [];  // channel => current_linkedid (для отслеживания изменений)
+    private array $linkedIdAliases = [];   // linkedId => canonical_linkedId (для объединения linkedId при pickup)
 
     // Throttling WebSocket updates
     private int $stateUpdateScheduled = 0;      // timestamp первого изменения (ms)
@@ -240,6 +241,13 @@ class WorkerActiveCalls extends WorkerBase
                 if (time() - ($data['pickup_time'] ?? 0) > 120) {
                     unset($this->pickupChannels[$channel]);
                     unset($this->channelLinkedIds[$channel]);
+                }
+            }
+
+            // Cleanup orphaned linkedIdAliases
+            foreach (array_keys($this->linkedIdAliases) as $aliasLinkedId) {
+                if (!isset($channelsData[$aliasLinkedId])) {
+                    unset($this->linkedIdAliases[$aliasLinkedId]);
                 }
             }
 
@@ -601,11 +609,12 @@ class WorkerActiveCalls extends WorkerBase
             }
         }
 
-        // Строим карту channel -> linkedId
+        // Строим карту channel -> linkedId (с учетом алиасов)
         $channelToLinkedId = [];
         foreach ($this->activeChannels as $linkedId => $channels) {
+            $canonicalLinkedId = $this->resolveLinkedId($linkedId);
             foreach (array_keys($channels) as $channel) {
-                $channelToLinkedId[$channel] = $linkedId;
+                $channelToLinkedId[$channel] = $canonicalLinkedId;
             }
         }
 
@@ -682,6 +691,25 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
+     * Разрешает linkedId в канонический через цепочку алиасов.
+     *
+     * @param string $linkedId LinkedId для разрешения
+     * @return string Канонический linkedId
+     */
+    private function resolveLinkedId(string $linkedId): string
+    {
+        $visited = [];
+        $current = $linkedId;
+
+        while (isset($this->linkedIdAliases[$current]) && !isset($visited[$current])) {
+            $visited[$current] = true;
+            $current = $this->linkedIdAliases[$current];
+        }
+
+        return $current;
+    }
+
+    /**
      * Миграция канала из одного linkedId в другой при изменении linkedid (например, при call pickup).
      *
      * @param string $channel Имя канала
@@ -735,23 +763,41 @@ class WorkerActiveCalls extends WorkerBase
                 break;
             }
             $chFound = false;
-            if(!isset($this->activeBridges[$linkedId])){
-                break;
+
+            // Собираем список всех linkedId для поиска (текущий + все связанные через алиасы)
+            $linkedIdsToSearch = [$linkedId];
+            // Добавляем все linkedId, которые ссылаются на наш канонический
+            $canonicalLinkedId = $this->resolveLinkedId($linkedId);
+            if ($canonicalLinkedId !== $linkedId) {
+                $linkedIdsToSearch[] = $canonicalLinkedId;
             }
-            foreach ($this->activeBridges[$linkedId] as $bridge) {
-                if(count($bridge) === 1){
+            // Добавляем все linkedId, которые имеют алиас на наш текущий или канонический
+            foreach ($this->linkedIdAliases as $alias => $target) {
+                if ($target === $linkedId || $target === $canonicalLinkedId) {
+                    $linkedIdsToSearch[] = $alias;
+                }
+            }
+
+            // Ищем bridge в любом из связанных linkedId
+            foreach ($linkedIdsToSearch as $searchLinkedId) {
+                if(!isset($this->activeBridges[$searchLinkedId])){
                     continue;
                 }
-                if($dstChannel === array_key_first($bridge)){
-                    $dstChannel = $this->swapLocalSuffix(array_key_last($bridge));
-                    $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
-                    $chFound = true;
-                    break;
-                }elseif ($dstChannel === array_key_last($bridge)){
-                    $dstChannel = $this->swapLocalSuffix(array_key_first($bridge));
-                    $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
-                    $chFound = true;
-                    break;
+                foreach ($this->activeBridges[$searchLinkedId] as $bridge) {
+                    if(count($bridge) === 1){
+                        continue;
+                    }
+                    if($dstChannel === array_key_first($bridge)){
+                        $dstChannel = $this->swapLocalSuffix(array_key_last($bridge));
+                        $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
+                        $chFound = true;
+                        break 2; // Выход из обоих foreach
+                    }elseif ($dstChannel === array_key_last($bridge)){
+                        $dstChannel = $this->swapLocalSuffix(array_key_first($bridge));
+                        $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
+                        $chFound = true;
+                        break 2; // Выход из обоих foreach
+                    }
                 }
             }
         }
@@ -1146,6 +1192,7 @@ class WorkerActiveCalls extends WorkerBase
             if(empty($this->activeChannels[$foundLinkedId])){
                 unset($this->activeChannels[$foundLinkedId]);
                 unset($this->callType[$foundLinkedId]);
+                unset($this->linkedIdAliases[$foundLinkedId]); // Очистить алиас если linkedId опустел
             }
         }elseif(in_array($event, ['Newchannel','Newstate']) && stripos($parameters['Channel'] ?? '', 'local') === false){
             $linkedId = $parameters['Linkedid'] ?? '';
@@ -1239,16 +1286,54 @@ class WorkerActiveCalls extends WorkerBase
             $linkedId = $parameters['Linkedid'] ?? '';
             $bridgeUniqueid = $parameters['BridgeUniqueid'] ?? '';
             $beChannel = $parameters['Channel'] ?? '';
+            $swapUniqueid = $parameters['SwapUniqueid'] ?? '';
+
             if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
+                // Обработка SwapUniqueid - связывание двух linkedId при call pickup
+                if (!empty($swapUniqueid)) {
+                    // SwapUniqueid - это uniqueid канала, который был в bridge до swap
+                    // Найдем его linkedId
+                    $swapLinkedId = '';
+                    foreach ($this->activeChannels as $lid => $channels) {
+                        foreach ($channels as $ch => $chData) {
+                            if (($chData['Uniqueid'] ?? '') === $swapUniqueid) {
+                                $swapLinkedId = $lid;
+                                break 2;
+                            }
+                        }
+                    }
+
+                    if (!empty($swapLinkedId) && $swapLinkedId !== $linkedId) {
+                        // Создаем связь между linkedId (swap linkedId -> текущий linkedId)
+                        $this->linkedIdAliases[$swapLinkedId] = $linkedId;
+                        $this->logger->writeInfo("LinkedId alias created: $swapLinkedId -> $linkedId (SwapUniqueid=$swapUniqueid, pickup bridge)");
+                    }
+                }
+
                 // Проверить изменение linkedid для pickup-канала
                 if (isset($this->pickupChannels[$beChannel])) {
                     $initialLinkedId = $this->pickupChannels[$beChannel]['initial_linkedid'];
+                    $targetExtension = $this->pickupChannels[$beChannel]['target_extension'];
 
                     if ($initialLinkedId !== $linkedId) {
                         // LinkedId изменился при bridge! Мигрировать канал
                         $this->logger->writeInfo("LinkedId changed for pickup channel $beChannel: $initialLinkedId -> $linkedId (BridgeEnter)");
                         $this->migrateChannel($beChannel, $initialLinkedId, $linkedId);
                         $this->channelLinkedIds[$beChannel] = $linkedId;
+                    }
+
+                    // Найти linkedId исходного вызова (куда звонили target_extension)
+                    // и связать его с linkedId pickup-канала
+                    foreach ($this->activeChannels as $lid => $channels) {
+                        foreach ($channels as $ch => $chData) {
+                            $endpoint = self::getEndpointName($ch);
+                            if ($endpoint === $targetExtension && $lid !== $linkedId) {
+                                // Нашли исходный вызов - создаем алиас
+                                $this->linkedIdAliases[$lid] = $linkedId;
+                                $this->logger->writeInfo("LinkedId alias created for pickup: $lid -> $linkedId (target=$targetExtension)");
+                                break 2;
+                            }
+                        }
                     }
                 }
 
