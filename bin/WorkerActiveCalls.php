@@ -710,36 +710,64 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
-     * Миграция канала из одного linkedId в другой при изменении linkedid (например, при call pickup).
+     * Migrates a channel from one linkedId to another when linkedid changes (e.g., during call pickup).
+     * Also migrates all associated metadata (callType, bridges, spy channels).
      *
-     * @param string $channel Имя канала
-     * @param string $oldLinkedId Старый linkedid
-     * @param string $newLinkedId Новый linkedid
+     * @param string $channel Channel name to migrate
+     * @param string $oldLinkedId Source linkedid
+     * @param string $newLinkedId Target linkedid
      * @return void
      */
     private function migrateChannel(string $channel, string $oldLinkedId, string $newLinkedId): void
     {
-        // 1. Переместить данные канала из activeChannels
-        if (isset($this->activeChannels[$oldLinkedId][$channel])) {
-            $channelData = $this->activeChannels[$oldLinkedId][$channel];
-            $this->activeChannels[$newLinkedId][$channel] = $channelData;
-            unset($this->activeChannels[$oldLinkedId][$channel]);
-
-            $this->logger->writeInfo("Migrated channel $channel: $oldLinkedId -> $newLinkedId");
+        if ($oldLinkedId === $newLinkedId) {
+            return; // Nothing to migrate
         }
 
-        // 2. Очистить старый linkedId если он опустел
+        // 1. Migrate channel data from activeChannels
+        if (isset($this->activeChannels[$oldLinkedId][$channel])) {
+            $this->activeChannels[$newLinkedId][$channel] = $this->activeChannels[$oldLinkedId][$channel];
+            unset($this->activeChannels[$oldLinkedId][$channel]);
+        }
+
+        // 2. Migrate call metadata (callType) if old linkedId has no more channels
+        if (isset($this->callType[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            if (!isset($this->callType[$newLinkedId])) {
+                $this->callType[$newLinkedId] = $this->callType[$oldLinkedId];
+            }
+            unset($this->callType[$oldLinkedId]);
+        }
+
+        // 3. Migrate bridge data
+        if (isset($this->activeBridges[$oldLinkedId])) {
+            foreach ($this->activeBridges[$oldLinkedId] as $bridgeId => $channels) {
+                if (isset($channels[$channel])) {
+                    $this->activeBridges[$newLinkedId][$bridgeId][$channel] = $channels[$channel];
+                    unset($this->activeBridges[$oldLinkedId][$bridgeId][$channel]);
+                }
+            }
+            // Clean up empty bridges
+            foreach ($this->activeBridges[$oldLinkedId] as $bridgeId => $channels) {
+                if (empty($channels)) {
+                    unset($this->activeBridges[$oldLinkedId][$bridgeId]);
+                }
+            }
+            if (empty($this->activeBridges[$oldLinkedId])) {
+                unset($this->activeBridges[$oldLinkedId]);
+            }
+        }
+
+        // 4. Migrate spy channel data
+        if (isset($this->spyerChannels[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            if (!isset($this->spyerChannels[$newLinkedId])) {
+                $this->spyerChannels[$newLinkedId] = $this->spyerChannels[$oldLinkedId];
+            }
+            unset($this->spyerChannels[$oldLinkedId]);
+        }
+
+        // 5. Clean up old linkedId if completely empty
         if (isset($this->activeChannels[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
             unset($this->activeChannels[$oldLinkedId]);
-            $this->logger->writeInfo("Removed empty linkedId $oldLinkedId after migration");
-        }
-
-        // 3. Обновить activeBridges если канал был в bridge
-        foreach ($this->activeBridges[$oldLinkedId] ?? [] as $bridgeId => $channels) {
-            if (isset($channels[$channel])) {
-                $this->activeBridges[$newLinkedId][$bridgeId][$channel] = $channels[$channel];
-                unset($this->activeBridges[$oldLinkedId][$bridgeId][$channel]);
-            }
         }
     }
 
@@ -1289,10 +1317,8 @@ class WorkerActiveCalls extends WorkerBase
             $swapUniqueid = $parameters['SwapUniqueid'] ?? '';
 
             if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
-                // Обработка SwapUniqueid - связывание двух linkedId при call pickup
+                // Handle SwapUniqueid - links two linkedIds during call pickup
                 if (!empty($swapUniqueid)) {
-                    // SwapUniqueid - это uniqueid канала, который был в bridge до swap
-                    // Найдем его linkedId
                     $swapLinkedId = '';
                     foreach ($this->activeChannels as $lid => $channels) {
                         foreach ($channels as $ch => $chData) {
@@ -1304,40 +1330,79 @@ class WorkerActiveCalls extends WorkerBase
                     }
 
                     if (!empty($swapLinkedId) && $swapLinkedId !== $linkedId) {
-                        // Создаем связь между linkedId (swap linkedId -> текущий linkedId)
                         $this->linkedIdAliases[$swapLinkedId] = $linkedId;
-                        $this->logger->writeInfo("LinkedId alias created: $swapLinkedId -> $linkedId (SwapUniqueid=$swapUniqueid, pickup bridge)");
                     }
                 }
 
-                // Проверить изменение linkedid для pickup-канала
+                // Add channel to bridge first (required for subsequent lookups)
+                $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
+
+                // Handle pickup channel entering bridge
                 if (isset($this->pickupChannels[$beChannel])) {
                     $initialLinkedId = $this->pickupChannels[$beChannel]['initial_linkedid'];
-                    $targetExtension = $this->pickupChannels[$beChannel]['target_extension'];
 
+                    // Check if linkedId changed during bridge entry
                     if ($initialLinkedId !== $linkedId) {
-                        // LinkedId изменился при bridge! Мигрировать канал
-                        $this->logger->writeInfo("LinkedId changed for pickup channel $beChannel: $initialLinkedId -> $linkedId (BridgeEnter)");
                         $this->migrateChannel($beChannel, $initialLinkedId, $linkedId);
                         $this->channelLinkedIds[$beChannel] = $linkedId;
                     }
 
-                    // Найти linkedId исходного вызова (куда звонили target_extension)
-                    // и связать его с linkedId pickup-канала
-                    foreach ($this->activeChannels as $lid => $channels) {
-                        foreach ($channels as $ch => $chData) {
-                            $endpoint = self::getEndpointName($ch);
-                            if ($endpoint === $targetExtension && $lid !== $linkedId) {
-                                // Нашли исходный вызов - создаем алиас
-                                $this->linkedIdAliases[$lid] = $linkedId;
-                                $this->logger->writeInfo("LinkedId alias created for pickup: $lid -> $linkedId (target=$targetExtension)");
-                                break 2;
+                    // Find other linkedIds in the same bridge and create alias
+                    // (Asterisk changes linkedId asynchronously AFTER BridgeEnter,
+                    // so we create the alias proactively)
+                    $aliasCreated = false;
+                    foreach ($this->activeBridges as $lid => $bridges) {
+                        if ($lid === $linkedId || $lid === $initialLinkedId) {
+                            continue;
+                        }
+                        if (isset($bridges[$bridgeUniqueid]) && !empty($bridges[$bridgeUniqueid])) {
+                            $this->linkedIdAliases[$initialLinkedId] = $lid;
+                            if ($initialLinkedId !== $linkedId) {
+                                $this->migrateChannel($beChannel, $linkedId, $lid);
+                            }
+                            $aliasCreated = true;
+                            break;
+                        }
+                    }
+
+                    // Fallback: search by target extension if alias not created
+                    if (!$aliasCreated) {
+                        $targetExtension = $this->pickupChannels[$beChannel]['target_extension'];
+                        foreach ($this->activeChannels as $lid => $channels) {
+                            foreach ($channels as $ch => $chData) {
+                                $endpoint = self::getEndpointName($ch);
+                                if ($endpoint === $targetExtension && $lid !== $linkedId && $lid !== $initialLinkedId) {
+                                    $this->linkedIdAliases[$initialLinkedId] = $lid;
+                                    if ($initialLinkedId !== $linkedId) {
+                                        $this->migrateChannel($beChannel, $linkedId, $lid);
+                                    }
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Not a pickup channel: check if bridge contains a pickup channel
+                    // (reverse scenario: pickup channel entered first, normal channel entering now)
+                    foreach ($this->activeBridges as $lid => $bridges) {
+                        if ($lid === $linkedId) {
+                            continue;
+                        }
+                        if (isset($bridges[$bridgeUniqueid])) {
+                            foreach ($bridges[$bridgeUniqueid] as $bridgeChannel => $_) {
+                                if (isset($this->pickupChannels[$bridgeChannel])) {
+                                    $pickupInitialLinkedId = $this->pickupChannels[$bridgeChannel]['initial_linkedid'];
+                                    if ($pickupInitialLinkedId !== $linkedId) {
+                                        $this->linkedIdAliases[$pickupInitialLinkedId] = $linkedId;
+                                        $this->migrateChannel($bridgeChannel, $pickupInitialLinkedId, $linkedId);
+                                        $this->channelLinkedIds[$bridgeChannel] = $linkedId;
+                                        break 2;
+                                    }
+                                }
                             }
                         }
                     }
                 }
-
-                $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
             }
         }elseif ('ChanSpyStart' === $event){
             $spyerChannel = $parameters['SpyerChannel'] ?? '';
