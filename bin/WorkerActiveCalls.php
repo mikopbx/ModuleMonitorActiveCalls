@@ -53,6 +53,10 @@ class WorkerActiveCalls extends WorkerBase
     private array $spyerChannels = [];
     private array $agentToQueues = []; // agent number => [queueIds]
 
+    // Call pickup tracking
+    private array $pickupChannels = [];    // channel => ['target_extension' => ..., 'initial_linkedid' => ..., 'pickup_time' => ...]
+    private array $channelLinkedIds = [];  // channel => current_linkedid (для отслеживания изменений)
+
     // Throttling WebSocket updates
     private int $stateUpdateScheduled = 0;      // timestamp первого изменения (ms)
     private float $lastStateUpdateSent = 0.0;   // timestamp последней отправки (ms)
@@ -228,6 +232,28 @@ class WorkerActiveCalls extends WorkerBase
             foreach (array_keys($this->activeBridges) as $bridgeLinkedId) {
                 if (!isset($channelsData[$bridgeLinkedId])) {
                     unset($this->activeBridges[$bridgeLinkedId]);
+                }
+            }
+
+            // Cleanup old pickup mappings (старше 2 минут)
+            foreach ($this->pickupChannels as $channel => $data) {
+                if (time() - ($data['pickup_time'] ?? 0) > 120) {
+                    unset($this->pickupChannels[$channel]);
+                    unset($this->channelLinkedIds[$channel]);
+                }
+            }
+
+            // Cleanup orphaned channelLinkedIds
+            foreach (array_keys($this->channelLinkedIds) as $channel) {
+                $found = false;
+                foreach ($this->activeChannels as $channels) {
+                    if (isset($channels[$channel])) {
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    unset($this->channelLinkedIds[$channel]);
                 }
             }
         }catch (\Throwable $e){
@@ -656,6 +682,40 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
+     * Миграция канала из одного linkedId в другой при изменении linkedid (например, при call pickup).
+     *
+     * @param string $channel Имя канала
+     * @param string $oldLinkedId Старый linkedid
+     * @param string $newLinkedId Новый linkedid
+     * @return void
+     */
+    private function migrateChannel(string $channel, string $oldLinkedId, string $newLinkedId): void
+    {
+        // 1. Переместить данные канала из activeChannels
+        if (isset($this->activeChannels[$oldLinkedId][$channel])) {
+            $channelData = $this->activeChannels[$oldLinkedId][$channel];
+            $this->activeChannels[$newLinkedId][$channel] = $channelData;
+            unset($this->activeChannels[$oldLinkedId][$channel]);
+
+            $this->logger->writeInfo("Migrated channel $channel: $oldLinkedId -> $newLinkedId");
+        }
+
+        // 2. Очистить старый linkedId если он опустел
+        if (isset($this->activeChannels[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            unset($this->activeChannels[$oldLinkedId]);
+            $this->logger->writeInfo("Removed empty linkedId $oldLinkedId after migration");
+        }
+
+        // 3. Обновить activeBridges если канал был в bridge
+        foreach ($this->activeBridges[$oldLinkedId] ?? [] as $bridgeId => $channels) {
+            if (isset($channels[$channel])) {
+                $this->activeBridges[$newLinkedId][$bridgeId][$channel] = $channels[$channel];
+                unset($this->activeBridges[$oldLinkedId][$bridgeId][$channel]);
+            }
+        }
+    }
+
+    /**
      * Поиск связанного канала.
      * @param $linkedId
      * @param $dstChannel
@@ -1048,6 +1108,10 @@ class WorkerActiveCalls extends WorkerBase
             }
             $endpoint = self::getEndpointName($channel);
 
+            // Очистить маппинги для канала
+            unset($this->channelLinkedIds[$channel]);
+            unset($this->pickupChannels[$channel]);
+
             // Попытка удалить канал из указанного linkedId
             $foundLinkedId = $linkedId;
             if (!isset($this->activeChannels[$linkedId][$channel])) {
@@ -1102,6 +1166,17 @@ class WorkerActiveCalls extends WorkerBase
             }else{
                 $extension = $parameters['Exten'] ?? '';
                 $inApp = $context === 'applications';
+            }
+
+            // Определение pickup-канала по extension *8XXX
+            if (preg_match('/^\*8(\d+)$/', $extension, $matches)) {
+                $this->channelLinkedIds[$channel] = $linkedId;
+                $this->pickupChannels[$channel] = [
+                    'target_extension' => $matches[1],
+                    'initial_linkedid' => $linkedId,
+                    'pickup_time' => time()
+                ];
+                $this->logger->writeInfo("Pickup channel detected: $channel (*8{$matches[1]}), linkedid=$linkedId");
             }
 
             $chanData = [
@@ -1165,6 +1240,18 @@ class WorkerActiveCalls extends WorkerBase
             $bridgeUniqueid = $parameters['BridgeUniqueid'] ?? '';
             $beChannel = $parameters['Channel'] ?? '';
             if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
+                // Проверить изменение linkedid для pickup-канала
+                if (isset($this->pickupChannels[$beChannel])) {
+                    $initialLinkedId = $this->pickupChannels[$beChannel]['initial_linkedid'];
+
+                    if ($initialLinkedId !== $linkedId) {
+                        // LinkedId изменился при bridge! Мигрировать канал
+                        $this->logger->writeInfo("LinkedId changed for pickup channel $beChannel: $initialLinkedId -> $linkedId (BridgeEnter)");
+                        $this->migrateChannel($beChannel, $initialLinkedId, $linkedId);
+                        $this->channelLinkedIds[$beChannel] = $linkedId;
+                    }
+                }
+
                 $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
             }
         }elseif ('ChanSpyStart' === $event){
