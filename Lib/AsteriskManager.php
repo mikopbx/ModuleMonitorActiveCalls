@@ -570,7 +570,7 @@ class AsteriskManager
      */
     public function setSocketTimeout(int $seconds, int $microseconds = 0): bool
     {
-        if ($this->socket === false) {
+        if (!is_resource($this->socket)) {
             return false;
         }
         return stream_set_timeout($this->socket, $seconds, $microseconds);
