@@ -169,7 +169,7 @@ class WorkerActiveCalls extends WorkerBase
         }
         $this->logger->writeInfo('Start channelAdditionalControl...');
         try{
-            $channelsData = WorkerAmiActions::invokeApi('getChannels', []);
+            $channelsData = $this->amCustom->GetChannels();
             if (!is_array($channelsData) || empty($channelsData)) {
                 // Пустой массив может быть признаком некорректной работы $channelsData
                 // Не обрабатывает такой вариант.
@@ -390,7 +390,7 @@ class WorkerActiveCalls extends WorkerBase
                 'typeCall' => $this->callType[$linkedid]['type']??'',
                 'src_chan' => $srcChan,
                 'src_num'  => $callData[$srcChan]['CallerIDNum']??'',
-                'exten'    => ($callData[$srcChan]['InApp']??false)?$callData[$srcChan]['Exten']??'':'',
+                'exten'    => $callData[$srcChan]['Exten']??'',
                 'dst_chan' => '',
                 'dst_num'  => '',
                 'did'      => $this->callType[$linkedid]['did']??'',
