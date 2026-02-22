@@ -63,6 +63,11 @@ class WorkerActiveCalls extends WorkerBase
     private float $lastStateUpdateSent = 0.0;   // timestamp последней отправки (ms)
     private $pendingUserStatesData = null;      // накопленные изменения
 
+    // Periodic nchan re-publish (для новых подписчиков при отсутствии событий)
+    private int $lastNchanPublishTime = 0;          // timestamp последней публикации в nchan (unix)
+    private $lastPublishedCallData = null;          // последние опубликованные данные active calls
+    private $lastPublishedStatesData = null;        // последние опубликованные данные users states
+
     public const ENDPOINT_TYPE_PEER = '1';
     public const ENDPOINT_TYPE_PROVIDER = '2';
     public const STATE_IDLE         = 'Idle';
@@ -112,6 +117,7 @@ class WorkerActiveCalls extends WorkerBase
     private const MAX_BRIDGE_ITERATIONS = 200;
     private const AMI_REQUEST_TIMEOUT = 200000;
     private const STATE_UPDATE_DELAY = 200; // ms - задержка debounce для WebSocket обновлений
+    private const NCHAN_REPUBLISH_INTERVAL = 30; // секунды - интервал повторной публикации в nchan для новых подписчиков
 
     public const STATE_FILE = '/tmp/MonitorActiveCalls_worker.state';
 
@@ -296,6 +302,7 @@ class WorkerActiveCalls extends WorkerBase
         $this->amCustom->setOnIdleCallback(function () {
             self::updateStateFile('running');
             $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+            $this->republishToNchan();        // Переиздаём данные для новых подписчиков
         }, 1); // Проверка каждую секунду для быстрой отправки WS updates
         while ($this->needRestart === false) {
             try {
@@ -307,6 +314,7 @@ class WorkerActiveCalls extends WorkerBase
                     $this->amCustom->setOnIdleCallback(function () {
                         self::updateStateFile('running');
                         $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+                        $this->republishToNchan();        // Переиздаём данные для новых подписчиков
                     }, 1); // Проверка каждую секунду для быстрой отправки WS updates
                 }
             } catch (\Throwable $e) {
@@ -496,7 +504,9 @@ class WorkerActiveCalls extends WorkerBase
             CacheManager::setCacheData('getActiveChannelsV2Action', $callData, self::CACHE_TTL);
             if($this->backendExists) {
                 BackendApiController::publishActiveCalls($callData);
+                $this->lastNchanPublishTime = time();
             }
+            $this->lastPublishedCallData = $callData;
         }
         unset($callData);
 
@@ -556,11 +566,36 @@ class WorkerActiveCalls extends WorkerBase
             CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
             if ($this->backendExists) {
                 BackendApiController::publishUserStates($this->pendingUserStatesData);
+                $this->lastNchanPublishTime = time();
             }
+            $this->lastPublishedStatesData = $this->pendingUserStatesData;
             $this->lastStateUpdateSent = $now;
             $this->pendingUserStatesData = null;
         }
         $this->stateUpdateScheduled = 0;
+    }
+
+    /**
+     * Периодически переиздаёт данные в nchan, даже если состояние не изменилось.
+     * Гарантирует, что новые WebSocket-подписчики получат актуальные данные,
+     * когда на АТС нет активных звонков и AMI-события не приходят.
+     */
+    private function republishToNchan(): void
+    {
+        if (!$this->backendExists) {
+            return;
+        }
+        if (time() - $this->lastNchanPublishTime < self::NCHAN_REPUBLISH_INTERVAL) {
+            return;
+        }
+        $this->lastNchanPublishTime = time();
+
+        if ($this->lastPublishedCallData !== null) {
+            BackendApiController::publishActiveCalls($this->lastPublishedCallData);
+        }
+        if ($this->lastPublishedStatesData !== null) {
+            BackendApiController::publishUserStates($this->lastPublishedStatesData);
+        }
     }
 
     /**
