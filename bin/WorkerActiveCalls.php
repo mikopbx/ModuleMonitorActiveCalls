@@ -176,9 +176,8 @@ class WorkerActiveCalls extends WorkerBase
         $this->logger->writeInfo('Start channelAdditionalControl...');
         try{
             $channelsData = $this->amCustom->GetChannels();
-            if (!is_array($channelsData) || empty($channelsData)) {
-                // Пустой массив может быть признаком некорректной работы $channelsData
-                // Не обрабатывает такой вариант.
+            if ($channelsData === null) {
+                // AMI communication error — skip cleanup to avoid false positives
                 return;
             }
 
@@ -960,6 +959,9 @@ class WorkerActiveCalls extends WorkerBase
     private function collectActiveChannels():void
     {
         $channelsData = $this->amCustom->GetChannels();
+        if (!is_array($channelsData)) {
+            return;
+        }
         foreach ($channelsData as $linkedId => $channels) {
             foreach ($channels as $channel) {
                 if(stripos($channel, 'local') !== false) {

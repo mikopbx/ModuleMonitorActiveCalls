@@ -855,11 +855,14 @@ class AsteriskManager
      * Get the channels information.
      *
      * @param bool $group Indicates whether to group the channels by Linkedid (optional, default is true).
-     * @return array The channels information.
+     * @return array|null The channels information, or null on AMI communication error.
      */
-    public function GetChannels(bool $group = true): array
+    public function GetChannels(bool $group = true)
     {
         $res      = $this->sendRequestTimeout('CoreShowChannels');
+        if (empty($res)) {
+            return null;
+        }
         $channels = null;
         if (isset($res['data']['CoreShowChannel'])) {
             $channels = $res['data']['CoreShowChannel'];
