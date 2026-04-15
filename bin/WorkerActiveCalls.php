@@ -414,10 +414,10 @@ class WorkerActiveCalls extends WorkerBase
             $bridgeStart = time();
             $chFound = $this->findBridgeChannel($linkedid,$dstChannel, $bridgeStart);
 
-            if($chFound){
+            if($chFound && isset($callData[$dstChannel])){
                 // Активный разговор
                 $call['dst_chan'] = $dstChannel;
-                $call['dst_num']  = $callData[$dstChannel]['CallerIDNum'];
+                $call['dst_num']  = $callData[$dstChannel]['CallerIDNum'] ?? '';
 
                 // Обновляем статус агента очереди
                 $this->updateAgentState($queuesData, $call['dst_num'], self::STATE_UP);
@@ -432,19 +432,19 @@ class WorkerActiveCalls extends WorkerBase
                     $tmpDstChannel  = $channel;
                     $tmpBridgeStart = time();
                     $tmpChFound = $this->findBridgeChannel($linkedid,$tmpDstChannel, $tmpBridgeStart);
-                    if(!$tmpChFound){
+                    if(!$tmpChFound || !isset($callData[$tmpDstChannel])){
                         // Идет дозвон.
                         $call['calledChannels'][] = [
                             'channel' => $channel,
-                            'number'  => $channelData['CallerIDNum'],
+                            'number'  => $channelData['CallerIDNum'] ?? '',
                         ];
                     }elseif(!isset($bridgeChannels[$channel])){
                         // Вероятная переадресация с консультацией. Начальный канал в ожидании.
                         $bridgeChannels[$channel] = true;
                         $bridgeChannels[$tmpDstChannel] = true;
 
-                        $tmpSrcNum = $channelData['CallerIDNum'];
-                        $tmpDstNum = $callData[$tmpDstChannel]['CallerIDNum'];
+                        $tmpSrcNum = $channelData['CallerIDNum'] ?? '';
+                        $tmpDstNum = $callData[$tmpDstChannel]['CallerIDNum'] ?? '';
                         $call['bridgeChannels'][] = [
                             'answer' => $tmpBridgeStart,
                             'src_chan' => $channel,
@@ -1377,6 +1377,33 @@ class WorkerActiveCalls extends WorkerBase
 
                 // Add channel to bridge first (required for subsequent lookups)
                 $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
+
+                // Обобщённая миграция linkedId: Asterisk может сменить Linkedid канала при входе в бридж
+                // (call pickup *8, interception-bridge, attended transfer и пр.). Если канал уже есть в
+                // activeChannels под другим linkedId — переносим его метаданные сюда, чтобы не создавать
+                // фантомные записи и не ловить Undefined array key в printActiveCalls.
+                // Local-каналы не хранятся в activeChannels, для них проверка бессмысленна.
+                if (stripos($beChannel, 'local/') !== 0 && !isset($this->activeChannels[$linkedId][$beChannel])) {
+                    foreach ($this->activeChannels as $altLinkedId => $altChannels) {
+                        if ($altLinkedId === $linkedId) {
+                            continue;
+                        }
+                        if (isset($altChannels[$beChannel])) {
+                            $this->logger->writeInfo(
+                                "BridgeEnter linkedId change detected: $beChannel migrated from $altLinkedId to $linkedId " .
+                                "(bridge=$bridgeUniqueid, context=" . ($parameters['Context'] ?? '') . ")"
+                            );
+                            $this->migrateChannel($beChannel, $altLinkedId, $linkedId);
+                            $this->channelLinkedIds[$beChannel] = $linkedId;
+                            // Алиас нужен, чтобы findBridgeChannel мог резолвить исторические bridge'и под старым linkedId.
+                            // Не перезаписываем обратный алиас, иначе получим цикл A→B→A в linkedIdAliases.
+                            if (($this->linkedIdAliases[$linkedId] ?? '') !== $altLinkedId) {
+                                $this->linkedIdAliases[$altLinkedId] = $linkedId;
+                            }
+                            break;
+                        }
+                    }
+                }
 
                 // Handle pickup channel entering bridge
                 if (isset($this->pickupChannels[$beChannel])) {
