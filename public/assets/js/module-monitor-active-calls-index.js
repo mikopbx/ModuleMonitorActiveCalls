@@ -1021,6 +1021,35 @@ var ModuleMonitorActiveCalls = {
     this._authTokens.refresh_token = refreshToken;
     this._authTokens.exp = this.getJwtExp(accessToken);
   },
+  refreshAuthToken: function refreshAuthToken() {
+    var _this$_authTokens,
+      _this4 = this;
+    var refreshToken = (_this$_authTokens = this._authTokens) === null || _this$_authTokens === void 0 ? void 0 : _this$_authTokens.refresh_token;
+    if (!refreshToken) {
+      this.requestBackendEnable();
+      return;
+    }
+    $.ajax({
+      url: '/pbxcore/api/module-softphone-backend/v1/auth/refresh',
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + refreshToken
+      },
+      success: function success(response) {
+        var accessToken = response === null || response === void 0 ? void 0 : response.access_token;
+        var newRefreshToken = response === null || response === void 0 ? void 0 : response.refresh_token;
+        if (accessToken && newRefreshToken) {
+          _this4.setAuthTokens(accessToken, newRefreshToken);
+          _this4.scheduleContactsWsTokenRefresh();
+        } else {
+          _this4.requestBackendEnable();
+        }
+      },
+      error: function error() {
+        _this4.requestBackendEnable();
+      }
+    });
+  },
   getJwtExp: function getJwtExp(token) {
     try {
       if (!token || typeof token !== 'string') return 0;
@@ -1036,32 +1065,30 @@ var ModuleMonitorActiveCalls = {
     }
   },
   isAccessTokenExpired: function isAccessTokenExpired() {
-    var _this$_authTokens;
+    var _this$_authTokens2;
     var skewSeconds = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
-    var exp = Number((_this$_authTokens = this._authTokens) === null || _this$_authTokens === void 0 ? void 0 : _this$_authTokens.exp) || 0;
+    var exp = Number((_this$_authTokens2 = this._authTokens) === null || _this$_authTokens2 === void 0 ? void 0 : _this$_authTokens2.exp) || 0;
     if (!exp) return false; // unknown exp -> don't force refresh
     var now = Math.floor(Date.now() / 1000);
     return now + skewSeconds >= exp;
   },
   scheduleContactsWsTokenRefresh: function scheduleContactsWsTokenRefresh() {
-    var _this$_authTokens2,
-      _this4 = this;
-    // Proactively refresh token shortly before expiry by re-requesting backendEnable.
+    var _this$_authTokens3,
+      _this5 = this;
     if (this._contactsWsTokenTimer) {
       clearTimeout(this._contactsWsTokenTimer);
       this._contactsWsTokenTimer = null;
     }
-    var exp = Number((_this$_authTokens2 = this._authTokens) === null || _this$_authTokens2 === void 0 ? void 0 : _this$_authTokens2.exp) || 0;
+    var exp = Number((_this$_authTokens3 = this._authTokens) === null || _this$_authTokens3 === void 0 ? void 0 : _this$_authTokens3.exp) || 0;
     if (!exp) return;
     var now = Math.floor(Date.now() / 1000);
     var refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
     this._contactsWsTokenTimer = setTimeout(function () {
-      // Re-get tokens and reconnect WS
-      _this4.requestBackendEnable();
+      _this5.refreshAuthToken();
     }, refreshInSec * 1000);
   },
   scheduleContactsWsReconnect: function scheduleContactsWsReconnect(reason) {
-    var _this5 = this;
+    var _this6 = this;
     var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     if (this._contactsWsReconnectTimer) {
       clearTimeout(this._contactsWsReconnectTimer);
@@ -1070,10 +1097,10 @@ var ModuleMonitorActiveCalls = {
     this._contactsWsReconnectAttempt = (this._contactsWsReconnectAttempt || 0) + 1;
     var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
     this._contactsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this5.isAccessTokenExpired(5)) {
-        _this5.requestBackendEnable();
+      if (forceReAuth || _this6.isAccessTokenExpired(5)) {
+        _this6.requestBackendEnable();
       } else {
-        _this5.connectContactsWs();
+        _this6.connectContactsWs();
       }
     }, delay);
     console.log('contacts ws reconnect scheduled', {
@@ -1082,10 +1109,10 @@ var ModuleMonitorActiveCalls = {
     });
   },
   connectContactsWs: function connectContactsWs() {
-    var _this6 = this;
+    var _this7 = this;
     try {
-      var _this$_authTokens3;
-      var accessToken = (_this$_authTokens3 = this._authTokens) === null || _this$_authTokens3 === void 0 ? void 0 : _this$_authTokens3.access_token;
+      var _this$_authTokens4;
+      var accessToken = (_this$_authTokens4 = this._authTokens) === null || _this$_authTokens4 === void 0 ? void 0 : _this$_authTokens4.access_token;
       if (!accessToken) return;
 
       // Avoid reconnecting if already connected/connecting
@@ -1101,10 +1128,10 @@ var ModuleMonitorActiveCalls = {
       this._contactsWs = new WebSocket(wsUrl);
       this._contactsWs.onopen = function () {
         console.log('contacts ws connected');
-        _this6.scheduleContactsWsTokenRefresh();
+        _this7.scheduleContactsWsTokenRefresh();
       };
       this._contactsWs.onmessage = function (event) {
-        _this6.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+        _this7.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
       };
       this._contactsWs.onerror = function (event) {
         console.log('contacts ws error', event);
@@ -1116,15 +1143,15 @@ var ModuleMonitorActiveCalls = {
           code: code,
           reason: reason
         });
-        if (_this6._contactsWsTokenTimer) {
-          clearTimeout(_this6._contactsWsTokenTimer);
-          _this6._contactsWsTokenTimer = null;
+        if (_this7._contactsWsTokenTimer) {
+          clearTimeout(_this7._contactsWsTokenTimer);
+          _this7._contactsWsTokenTimer = null;
         }
 
         // 1000 = normal close -> reconnect; auth closes vary by server implementation.
         var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this6.isAccessTokenExpired(0);
-        _this6.scheduleContactsWsReconnect('close', forceReAuth);
+        var forceReAuth = authCloseCodes.has(code) || _this7.isAccessTokenExpired(0);
+        _this7.scheduleContactsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('contacts ws init error', e);
@@ -1132,7 +1159,7 @@ var ModuleMonitorActiveCalls = {
     }
   },
   scheduleActiveCallsWsReconnect: function scheduleActiveCallsWsReconnect(reason) {
-    var _this7 = this;
+    var _this8 = this;
     var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
     if (this._activeCallsWsReconnectTimer) {
       clearTimeout(this._activeCallsWsReconnectTimer);
@@ -1141,10 +1168,10 @@ var ModuleMonitorActiveCalls = {
     this._activeCallsWsReconnectAttempt = (this._activeCallsWsReconnectAttempt || 0) + 1;
     var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._activeCallsWsReconnectAttempt - 1)));
     this._activeCallsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this7.isAccessTokenExpired(5)) {
-        _this7.requestBackendEnable();
+      if (forceReAuth || _this8.isAccessTokenExpired(5)) {
+        _this8.requestBackendEnable();
       } else {
-        _this7.connectActiveCallsWs();
+        _this8.connectActiveCallsWs();
       }
     }, delay);
     console.log('active-calls ws reconnect scheduled', {
@@ -1153,10 +1180,10 @@ var ModuleMonitorActiveCalls = {
     });
   },
   connectActiveCallsWs: function connectActiveCallsWs() {
-    var _this8 = this;
+    var _this9 = this;
     try {
-      var _this$_authTokens4;
-      var accessToken = (_this$_authTokens4 = this._authTokens) === null || _this$_authTokens4 === void 0 ? void 0 : _this$_authTokens4.access_token;
+      var _this$_authTokens5;
+      var accessToken = (_this$_authTokens5 = this._authTokens) === null || _this$_authTokens5 === void 0 ? void 0 : _this$_authTokens5.access_token;
       if (!accessToken) return;
 
       // Avoid reconnecting if already connected/connecting
@@ -1176,10 +1203,10 @@ var ModuleMonitorActiveCalls = {
       this._activeCallsWs.onopen = function () {
         console.log('active-calls ws connected');
         // Reuse the same token refresh timer (it triggers requestBackendEnable)
-        _this8.scheduleContactsWsTokenRefresh();
+        _this9.scheduleContactsWsTokenRefresh();
       };
       this._activeCallsWs.onmessage = function (event) {
-        _this8.handleActiveCallsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+        _this9.handleActiveCallsWsMessage(event === null || event === void 0 ? void 0 : event.data);
       };
       this._activeCallsWs.onerror = function (event) {
         console.log('active-calls ws error', event);
@@ -1194,8 +1221,8 @@ var ModuleMonitorActiveCalls = {
 
         // Auth closes vary by server implementation.
         var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this8.isAccessTokenExpired(0);
-        _this8.scheduleActiveCallsWsReconnect('close', forceReAuth);
+        var forceReAuth = authCloseCodes.has(code) || _this9.isAccessTokenExpired(0);
+        _this9.scheduleActiveCallsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('active-calls ws init error', e);

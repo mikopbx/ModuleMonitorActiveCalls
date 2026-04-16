@@ -53,6 +53,21 @@ class WorkerActiveCalls extends WorkerBase
     private array $spyerChannels = [];
     private array $agentToQueues = []; // agent number => [queueIds]
 
+    // Call pickup tracking
+    private array $pickupChannels = [];    // channel => ['target_extension' => ..., 'initial_linkedid' => ..., 'pickup_time' => ...]
+    private array $channelLinkedIds = [];  // channel => current_linkedid (для отслеживания изменений)
+    private array $linkedIdAliases = [];   // linkedId => canonical_linkedId (для объединения linkedId при pickup)
+
+    // Throttling WebSocket updates
+    private int $stateUpdateScheduled = 0;      // timestamp первого изменения (ms)
+    private float $lastStateUpdateSent = 0.0;   // timestamp последней отправки (ms)
+    private $pendingUserStatesData = null;      // накопленные изменения
+
+    // Periodic nchan re-publish (для новых подписчиков при отсутствии событий)
+    private int $lastNchanPublishTime = 0;          // timestamp последней публикации в nchan (unix)
+    private $lastPublishedCallData = null;          // последние опубликованные данные active calls
+    private $lastPublishedStatesData = null;        // последние опубликованные данные users states
+
     public const ENDPOINT_TYPE_PEER = '1';
     public const ENDPOINT_TYPE_PROVIDER = '2';
     public const STATE_IDLE         = 'Idle';
@@ -101,6 +116,10 @@ class WorkerActiveCalls extends WorkerBase
     private const CONTROL_INTERVAL = 60;
     private const MAX_BRIDGE_ITERATIONS = 200;
     private const AMI_REQUEST_TIMEOUT = 200000;
+    private const STATE_UPDATE_DELAY = 200; // ms - задержка debounce для WebSocket обновлений
+    private const NCHAN_REPUBLISH_INTERVAL = 30; // секунды - интервал повторной публикации в nchan для новых подписчиков
+
+    public const STATE_FILE = '/tmp/MonitorActiveCalls_worker.state';
 
     private array $queueEntryes = [];
 
@@ -131,6 +150,21 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
+     * Обновляет state-файл с текущим статусом воркера.
+     * Используется safe.php для контроля здоровья процесса.
+     *
+     * @param string $status 'starting' или 'running'
+     */
+    public static function updateStateFile(string $status = 'running'): void
+    {
+        file_put_contents(self::STATE_FILE, json_encode([
+            'pid' => getmypid(),
+            'ts' => time(),
+            'status' => $status,
+        ]));
+    }
+
+    /**
      * Дополнительный контроль активных вызовов.
      * @return void
      */
@@ -141,10 +175,9 @@ class WorkerActiveCalls extends WorkerBase
         }
         $this->logger->writeInfo('Start channelAdditionalControl...');
         try{
-            $channelsData = WorkerAmiActions::invokeApi('getChannels', []);
-            if (!is_array($channelsData) || empty($channelsData)) {
-                // Пустой массив может быть признаком некорректной работы $channelsData
-                // Не обрабатывает такой вариант.
+            $channelsData = $this->amCustom->GetChannels();
+            if ($channelsData === null) {
+                // AMI communication error — skip cleanup to avoid false positives
                 return;
             }
 
@@ -207,6 +240,35 @@ class WorkerActiveCalls extends WorkerBase
                     unset($this->activeBridges[$bridgeLinkedId]);
                 }
             }
+
+            // Cleanup old pickup mappings (старше 2 минут)
+            foreach ($this->pickupChannels as $channel => $data) {
+                if (time() - ($data['pickup_time'] ?? 0) > 120) {
+                    unset($this->pickupChannels[$channel]);
+                    unset($this->channelLinkedIds[$channel]);
+                }
+            }
+
+            // Cleanup orphaned linkedIdAliases
+            foreach (array_keys($this->linkedIdAliases) as $aliasLinkedId) {
+                if (!isset($channelsData[$aliasLinkedId])) {
+                    unset($this->linkedIdAliases[$aliasLinkedId]);
+                }
+            }
+
+            // Cleanup orphaned channelLinkedIds
+            foreach (array_keys($this->channelLinkedIds) as $channel) {
+                $found = false;
+                foreach ($this->activeChannels as $channels) {
+                    if (isset($channels[$channel])) {
+                        $found = true;
+                        break;
+                    }
+                }
+                if (!$found) {
+                    unset($this->channelLinkedIds[$channel]);
+                }
+            }
         }catch (\Throwable $e){
             SystemMessages::sysLogMsg( static::class, "Channel control: " . $e->getMessage(), LOG_WARNING);
         }
@@ -221,6 +283,7 @@ class WorkerActiveCalls extends WorkerBase
     {
         $this->logger = new Logger('ActiveCalls', 'ModuleMonitorActiveCalls');
         $this->logger->writeInfo('Starting...');
+        self::updateStateFile('starting');
 
         $this->backendExists = MonitorActiveCallsMain::backendExists();
         $this->initManagerAsterisk();
@@ -233,14 +296,25 @@ class WorkerActiveCalls extends WorkerBase
 
         $this->init = false;
         $this->printActiveCalls();
+        self::updateStateFile('running');
         $this->logger->writeInfo('Wait events...');
-        while (true) {
+        $this->amCustom->setOnIdleCallback(function () {
+            self::updateStateFile('running');
+            $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+            $this->republishToNchan();        // Переиздаём данные для новых подписчиков
+        }, 1); // Проверка каждую секунду для быстрой отправки WS updates
+        while ($this->needRestart === false) {
             try {
                 $this->amCustom->waitUserEvent(true);
                 if (!$this->amCustom->loggedIn()) {
                     sleep(1);
                     $this->logger->writeInfo('initManagerAsterisk...');
                     $this->initManagerAsterisk();
+                    $this->amCustom->setOnIdleCallback(function () {
+                        self::updateStateFile('running');
+                        $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
+                        $this->republishToNchan();        // Переиздаём данные для новых подписчиков
+                    }, 1); // Проверка каждую секунду для быстрой отправки WS updates
                 }
             } catch (\Throwable $e) {
                 $this->logger->writeError("Error in main loop: " . $e->getMessage());
@@ -323,7 +397,7 @@ class WorkerActiveCalls extends WorkerBase
                 'typeCall' => $this->callType[$linkedid]['type']??'',
                 'src_chan' => $srcChan,
                 'src_num'  => $callData[$srcChan]['CallerIDNum']??'',
-                'exten'    => ($callData[$srcChan]['InApp']??false)?$callData[$srcChan]['Exten']??'':'',
+                'exten'    => $callData[$srcChan]['Exten']??'',
                 'dst_chan' => '',
                 'dst_num'  => '',
                 'did'      => $this->callType[$linkedid]['did']??'',
@@ -340,10 +414,10 @@ class WorkerActiveCalls extends WorkerBase
             $bridgeStart = time();
             $chFound = $this->findBridgeChannel($linkedid,$dstChannel, $bridgeStart);
 
-            if($chFound){
+            if($chFound && isset($callData[$dstChannel])){
                 // Активный разговор
                 $call['dst_chan'] = $dstChannel;
-                $call['dst_num']  = $callData[$dstChannel]['CallerIDNum'];
+                $call['dst_num']  = $callData[$dstChannel]['CallerIDNum'] ?? '';
 
                 // Обновляем статус агента очереди
                 $this->updateAgentState($queuesData, $call['dst_num'], self::STATE_UP);
@@ -358,19 +432,19 @@ class WorkerActiveCalls extends WorkerBase
                     $tmpDstChannel  = $channel;
                     $tmpBridgeStart = time();
                     $tmpChFound = $this->findBridgeChannel($linkedid,$tmpDstChannel, $tmpBridgeStart);
-                    if(!$tmpChFound){
+                    if(!$tmpChFound || !isset($callData[$tmpDstChannel])){
                         // Идет дозвон.
                         $call['calledChannels'][] = [
                             'channel' => $channel,
-                            'number'  => $channelData['CallerIDNum'],
+                            'number'  => $channelData['CallerIDNum'] ?? '',
                         ];
                     }elseif(!isset($bridgeChannels[$channel])){
                         // Вероятная переадресация с консультацией. Начальный канал в ожидании.
                         $bridgeChannels[$channel] = true;
                         $bridgeChannels[$tmpDstChannel] = true;
 
-                        $tmpSrcNum = $channelData['CallerIDNum'];
-                        $tmpDstNum = $callData[$tmpDstChannel]['CallerIDNum'];
+                        $tmpSrcNum = $channelData['CallerIDNum'] ?? '';
+                        $tmpDstNum = $callData[$tmpDstChannel]['CallerIDNum'] ?? '';
                         $call['bridgeChannels'][] = [
                             'answer' => $tmpBridgeStart,
                             'src_chan' => $channel,
@@ -429,7 +503,9 @@ class WorkerActiveCalls extends WorkerBase
             CacheManager::setCacheData('getActiveChannelsV2Action', $callData, self::CACHE_TTL);
             if($this->backendExists) {
                 BackendApiController::publishActiveCalls($callData);
+                $this->lastNchanPublishTime = time();
             }
+            $this->lastPublishedCallData = $callData;
         }
         unset($callData);
 
@@ -437,14 +513,88 @@ class WorkerActiveCalls extends WorkerBase
         $data = ['states' => $enrichedStates];
         $dataPrint = json_encode($data, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
+
+        $now = (int)(microtime(true) * 1000); // текущее время в миллисекундах
+
+        // Если состояние изменилось
         if($newPrintHash <> $this->lastPrintUserHash){
             $this->lastPrintUserHash = $newPrintHash;
-            CacheManager::setCacheData('getUsersStates', $data, self::CACHE_TTL);
-            if($this->backendExists){
-                BackendApiController::publishUserStates($data);
+            $this->pendingUserStatesData = $data;
+
+            // Планируем отправку, если ещё не запланирована
+            if($this->stateUpdateScheduled === 0) {
+                $this->stateUpdateScheduled = $now;
+                $this->logger->writeInfo("WS throttle: State change detected, scheduled update");
+            } else {
+                $timeSinceScheduled = $now - $this->stateUpdateScheduled;
+                $this->logger->writeInfo("WS throttle: State changed again, pending send in {$timeSinceScheduled}ms");
             }
         }
 
+        // Проверяем, пора ли отправлять накопленные изменения
+        $this->flushPendingStateUpdate();
+
+    }
+
+    /**
+     * Отправляет накопленные обновления getUsersStates, если прошло достаточно времени.
+     * Может вызываться из scheduleUserStatesUpdate() и из idle callback.
+     */
+    private function flushPendingStateUpdate(): void
+    {
+        if ($this->stateUpdateScheduled === 0) {
+            return; // Нет запланированных обновлений
+        }
+
+        $now = (int)(microtime(true) * 1000);
+        $elapsed = $now - $this->stateUpdateScheduled;
+
+        if ($elapsed < self::STATE_UPDATE_DELAY) {
+            return; // Ещё рано отправлять
+        }
+
+        // Пора отправлять
+        if ($this->pendingUserStatesData !== null) {
+            $timeSinceLastSent = $this->lastStateUpdateSent > 0 ? $now - $this->lastStateUpdateSent : 0;
+            $payloadSize = strlen(json_encode($this->pendingUserStatesData, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE));
+
+            $this->logger->writeInfo("WS throttle: Sending update after {$elapsed}ms delay, " .
+                "payload: {$payloadSize} bytes, " .
+                "time since last: {$timeSinceLastSent}ms");
+
+            CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
+            if ($this->backendExists) {
+                BackendApiController::publishUserStates($this->pendingUserStatesData);
+                $this->lastNchanPublishTime = time();
+            }
+            $this->lastPublishedStatesData = $this->pendingUserStatesData;
+            $this->lastStateUpdateSent = $now;
+            $this->pendingUserStatesData = null;
+        }
+        $this->stateUpdateScheduled = 0;
+    }
+
+    /**
+     * Периодически переиздаёт данные в nchan, даже если состояние не изменилось.
+     * Гарантирует, что новые WebSocket-подписчики получат актуальные данные,
+     * когда на АТС нет активных звонков и AMI-события не приходят.
+     */
+    private function republishToNchan(): void
+    {
+        if (!$this->backendExists) {
+            return;
+        }
+        if (time() - $this->lastNchanPublishTime < self::NCHAN_REPUBLISH_INTERVAL) {
+            return;
+        }
+        $this->lastNchanPublishTime = time();
+
+        if ($this->lastPublishedCallData !== null) {
+            BackendApiController::publishActiveCalls($this->lastPublishedCallData);
+        }
+        if ($this->lastPublishedStatesData !== null) {
+            BackendApiController::publishUserStates($this->lastPublishedStatesData);
+        }
     }
 
     /**
@@ -457,52 +607,93 @@ class WorkerActiveCalls extends WorkerBase
     {
         $states = $this->states;
 
-        // Строим карту channel -> [linkedId, connectedChannel, connectedNumber]
-        $channelConnections = [];
-        foreach ($this->activeBridges as $linkedId => $bridges) {
-            foreach ($bridges as $bridgeChannels) {
-                $channelList = array_keys($bridgeChannels);
-                if (count($channelList) !== 2) {
-                    continue;
-                }
-                $ch1 = $channelList[0];
-                $ch2 = $channelList[1];
-                $num1 = $this->activeChannels[$linkedId][$ch1]['CallerIDNum'] ?? '';
-                $num2 = $this->activeChannels[$linkedId][$ch2]['CallerIDNum'] ?? '';
+        // Обновляем состояние очередей на основе состояния агентов
+        foreach ($this->queuesData as $queueId => $queueData) {
+            $queueNumber = $queueData['number'] ?? '';
+            if (empty($queueNumber) || !isset($states[$queueNumber])) {
+                continue;
+            }
 
-                $channelConnections[$ch1] = ['channel' => $ch2, 'number' => $num2];
-                $channelConnections[$ch2] = ['channel' => $ch1, 'number' => $num1];
+            $hasIdleAgent = false;
+            $hasAvailableAgent = false;
+
+            foreach ($queueData['agents'] as $agentNumber) {
+                $agentState = '';
+                if (isset($this->states[$agentNumber])) {
+                    $agentState = $this->states[$agentNumber]['state'];
+                } elseif (isset($this->mobileStates[$agentNumber])) {
+                    $agentState = $this->mobileStates[$agentNumber]['state'];
+                }
+
+                if ($agentState === self::STATE_IDLE) {
+                    $hasIdleAgent = true;
+                    $hasAvailableAgent = true;
+                    break;
+                } elseif ($agentState !== self::STATE_UNAVAILABLE) {
+                    $hasAvailableAgent = true;
+                }
+            }
+
+            if ($hasIdleAgent) {
+                $states[$queueNumber]['state'] = self::STATE_IDLE;
+            } elseif ($hasAvailableAgent) {
+                $states[$queueNumber]['state'] = self::STATE_BUSY;
+            } else {
+                $states[$queueNumber]['state'] = self::STATE_UNAVAILABLE;
             }
         }
 
-        // Строим карту channel -> ConnectedLineNum из activeChannels
-        $channelToConnectedLine = [];
+        // Строим карту channel -> linkedId (с учетом алиасов)
+        $channelToLinkedId = [];
         foreach ($this->activeChannels as $linkedId => $channels) {
-            foreach ($channels as $channel => $data) {
-                $connectedNum = $data['ConnectedLineNum'] ?? '';
-                // Фильтруем <unknown> и подобные значения
-                if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
-                    $channelToConnectedLine[$channel] = $connectedNum;
-                }
+            $canonicalLinkedId = $this->resolveLinkedId($linkedId);
+            foreach (array_keys($channels) as $channel) {
+                $channelToLinkedId[$channel] = $canonicalLinkedId;
             }
         }
 
         // Обновляем channels в копии states
         foreach ($states as $endpoint => &$stateData) {
             if (empty($stateData['channels'])) {
+                unset($stateData['channels']); // Удаляем пустой ключ для экономии трафика
                 continue;
             }
             $enrichedChannels = [];
             foreach (array_keys($stateData['channels']) as $channel) {
-                if (isset($channelConnections[$channel])) {
-                    $enrichedChannels[$channel] = $channelConnections[$channel];
+                $linkedId = $channelToLinkedId[$channel] ?? '';
+                if (empty($linkedId)) {
+                    $enrichedChannels[$channel] = ['channel' => '', 'number' => '', 'direction' => ''];
+                    continue;
+                }
+
+                // Определяем направление звонка относительно владельца канала
+                $srcChan = $this->callType[$linkedId]['src_chan'] ?? '';
+                $direction = ($channel === $srcChan) ? 'outgoing' : 'incoming';
+
+                // Проходим цепочку бриджей через Local-каналы до реального PJSIP-канала
+                $resolvedChannel = $channel;
+                $bridgeStart = time();
+                $found = $this->findBridgeChannel($linkedId, $resolvedChannel, $bridgeStart);
+
+                if ($found && $resolvedChannel !== $channel) {
+                    $number = $this->activeChannels[$linkedId][$resolvedChannel]['CallerIDNum'] ?? '';
+                    $enrichedChannels[$channel] = ['channel' => $resolvedChannel, 'number' => $number, 'direction' => $direction];
                 } else {
-                    // Канал не в бридже (звонит/ожидает) - используем ConnectedLineNum
-                    $connectedNum = $channelToConnectedLine[$channel] ?? '';
-                    $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum];
+                    // Канал не в бридже (звонит/ожидает) — используем ConnectedLineNum
+                    $connectedNum = $this->activeChannels[$linkedId][$channel]['ConnectedLineNum'] ?? '';
+                    if (!empty($connectedNum) && strpos($connectedNum, '<') === false) {
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => $connectedNum, 'direction' => $direction];
+                    } else {
+                        $enrichedChannels[$channel] = ['channel' => '', 'number' => '', 'direction' => $direction];
+                    }
                 }
             }
-            $stateData['channels'] = $enrichedChannels;
+            // Добавляем channels только если есть данные
+            if (!empty($enrichedChannels)) {
+                $stateData['channels'] = $enrichedChannels;
+            } else {
+                unset($stateData['channels']); // Удаляем если обогащение не дало результата
+            }
         }
         unset($stateData);
 
@@ -534,6 +725,87 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
+     * Разрешает linkedId в канонический через цепочку алиасов.
+     *
+     * @param string $linkedId LinkedId для разрешения
+     * @return string Канонический linkedId
+     */
+    private function resolveLinkedId(string $linkedId): string
+    {
+        $visited = [];
+        $current = $linkedId;
+
+        while (isset($this->linkedIdAliases[$current]) && !isset($visited[$current])) {
+            $visited[$current] = true;
+            $current = $this->linkedIdAliases[$current];
+        }
+
+        return $current;
+    }
+
+    /**
+     * Migrates a channel from one linkedId to another when linkedid changes (e.g., during call pickup).
+     * Also migrates all associated metadata (callType, bridges, spy channels).
+     *
+     * @param string $channel Channel name to migrate
+     * @param string $oldLinkedId Source linkedid
+     * @param string $newLinkedId Target linkedid
+     * @return void
+     */
+    private function migrateChannel(string $channel, string $oldLinkedId, string $newLinkedId): void
+    {
+        if ($oldLinkedId === $newLinkedId) {
+            return; // Nothing to migrate
+        }
+
+        // 1. Migrate channel data from activeChannels
+        if (isset($this->activeChannels[$oldLinkedId][$channel])) {
+            $this->activeChannels[$newLinkedId][$channel] = $this->activeChannels[$oldLinkedId][$channel];
+            unset($this->activeChannels[$oldLinkedId][$channel]);
+        }
+
+        // 2. Migrate call metadata (callType) if old linkedId has no more channels
+        if (isset($this->callType[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            if (!isset($this->callType[$newLinkedId])) {
+                $this->callType[$newLinkedId] = $this->callType[$oldLinkedId];
+            }
+            unset($this->callType[$oldLinkedId]);
+        }
+
+        // 3. Migrate bridge data
+        if (isset($this->activeBridges[$oldLinkedId])) {
+            foreach ($this->activeBridges[$oldLinkedId] as $bridgeId => $channels) {
+                if (isset($channels[$channel])) {
+                    $this->activeBridges[$newLinkedId][$bridgeId][$channel] = $channels[$channel];
+                    unset($this->activeBridges[$oldLinkedId][$bridgeId][$channel]);
+                }
+            }
+            // Clean up empty bridges
+            foreach ($this->activeBridges[$oldLinkedId] as $bridgeId => $channels) {
+                if (empty($channels)) {
+                    unset($this->activeBridges[$oldLinkedId][$bridgeId]);
+                }
+            }
+            if (empty($this->activeBridges[$oldLinkedId])) {
+                unset($this->activeBridges[$oldLinkedId]);
+            }
+        }
+
+        // 4. Migrate spy channel data
+        if (isset($this->spyerChannels[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            if (!isset($this->spyerChannels[$newLinkedId])) {
+                $this->spyerChannels[$newLinkedId] = $this->spyerChannels[$oldLinkedId];
+            }
+            unset($this->spyerChannels[$oldLinkedId]);
+        }
+
+        // 5. Clean up old linkedId if completely empty
+        if (isset($this->activeChannels[$oldLinkedId]) && empty($this->activeChannels[$oldLinkedId])) {
+            unset($this->activeChannels[$oldLinkedId]);
+        }
+    }
+
+    /**
      * Поиск связанного канала.
      * @param $linkedId
      * @param $dstChannel
@@ -553,23 +825,41 @@ class WorkerActiveCalls extends WorkerBase
                 break;
             }
             $chFound = false;
-            if(!isset($this->activeBridges[$linkedId])){
-                break;
+
+            // Собираем список всех linkedId для поиска (текущий + все связанные через алиасы)
+            $linkedIdsToSearch = [$linkedId];
+            // Добавляем все linkedId, которые ссылаются на наш канонический
+            $canonicalLinkedId = $this->resolveLinkedId($linkedId);
+            if ($canonicalLinkedId !== $linkedId) {
+                $linkedIdsToSearch[] = $canonicalLinkedId;
             }
-            foreach ($this->activeBridges[$linkedId] as $bridge) {
-                if(count($bridge) === 1){
+            // Добавляем все linkedId, которые имеют алиас на наш текущий или канонический
+            foreach ($this->linkedIdAliases as $alias => $target) {
+                if ($target === $linkedId || $target === $canonicalLinkedId) {
+                    $linkedIdsToSearch[] = $alias;
+                }
+            }
+
+            // Ищем bridge в любом из связанных linkedId
+            foreach ($linkedIdsToSearch as $searchLinkedId) {
+                if(!isset($this->activeBridges[$searchLinkedId])){
                     continue;
                 }
-                if($dstChannel === array_key_first($bridge)){
-                    $dstChannel = $this->swapLocalSuffix(array_key_last($bridge));
-                    $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
-                    $chFound = true;
-                    break;
-                }elseif ($dstChannel === array_key_last($bridge)){
-                    $dstChannel = $this->swapLocalSuffix(array_key_first($bridge));
-                    $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
-                    $chFound = true;
-                    break;
+                foreach ($this->activeBridges[$searchLinkedId] as $bridge) {
+                    if(count($bridge) === 1){
+                        continue;
+                    }
+                    if($dstChannel === array_key_first($bridge)){
+                        $dstChannel = $this->swapLocalSuffix(array_key_last($bridge));
+                        $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
+                        $chFound = true;
+                        break 2; // Выход из обоих foreach
+                    }elseif ($dstChannel === array_key_last($bridge)){
+                        $dstChannel = $this->swapLocalSuffix(array_key_first($bridge));
+                        $tmpBridgeStart = $bridge[$dstChannel]??$tmpBridgeStart;
+                        $chFound = true;
+                        break 2; // Выход из обоих foreach
+                    }
                 }
             }
         }
@@ -624,6 +914,14 @@ class WorkerActiveCalls extends WorkerBase
         foreach ($queues as $queue){
             $this->queuesData[$queue->id] = $queue->toArray();
             $this->queuesData[$queue->id]['agents'] = [];
+
+            // Добавляем очередь в states
+            $this->states[$queue->number] = [
+                'state' => self::STATE_UNAVAILABLE,
+                'name' => $queue->name,
+                'channels' => [],
+                'isQueue' => true
+            ];
         }
         $queuesAgents = CallQueueMembers::find(['columns' => 'queue,extension']);
         foreach ($queuesAgents as $queuesAgent) {
@@ -661,6 +959,9 @@ class WorkerActiveCalls extends WorkerBase
     private function collectActiveChannels():void
     {
         $channelsData = $this->amCustom->GetChannels();
+        if (!is_array($channelsData)) {
+            return;
+        }
         foreach ($channelsData as $linkedId => $channels) {
             foreach ($channels as $channel) {
                 if(stripos($channel, 'local') !== false) {
@@ -693,6 +994,27 @@ class WorkerActiveCalls extends WorkerBase
 
                 $did = $this->amCustom->GetVar($channel, 'FROM_DID','', false);
                 if(!isset($this->callType[$linkedId])){
+                    if($chanData['Type'] === self::ENDPOINT_TYPE_PROVIDER){
+                        $callType = self::CALL_TYPE_IN;
+                    }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && !empty($did)){
+                        $callType = '';
+                    }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && empty($did)){
+                        $callType = self::CALL_TYPE_OUT;
+                    }else{
+                        $callType = self::CALL_TYPE_INNER;
+                    }
+                    if(!empty($callType)){
+                        $this->callType[$linkedId] = [
+                            'type'     => $callType,
+                            'src_chan' => $channel,
+                            'did'      => $did,
+                            'time'     => str_replace('mikopbx-','',$chanData['Uniqueid']),
+                            'answer'   => strtotime($this->amCustom->GetVar($channel, 'CDR(answer)','', false))
+                        ];
+                    }
+                } elseif ($chanData['Uniqueid'] === $linkedId) {
+                    // Этот канал — инициатор звонка (Uniqueid == Linkedid).
+                    // Переопределяем src_chan, т.к. порядок обхода каналов не гарантирован.
                     if($chanData['Type'] === self::ENDPOINT_TYPE_PROVIDER){
                         $callType = self::CALL_TYPE_IN;
                     }elseif ($chanData['Type'] === self::ENDPOINT_TYPE_PEER && !empty($did)){
@@ -850,7 +1172,14 @@ class WorkerActiveCalls extends WorkerBase
         $amiPort  = PbxSettings::getValueByKey('AMIPort');
         $this->amCustom = new CustomAsteriskManager();
         // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
-        $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
+        $connected = $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
+        if (!$connected) {
+            $this->logger->writeError("Failed to connect to AMI on port $amiPort");
+            return;
+        }
+        // Устанавливаем короткий timeout для быстрой отработки idle callback и отправки WebSocket updates
+        // 300ms оптимально согласуется с STATE_UPDATE_DELAY (200ms)
+        $this->amCustom->setSocketTimeout(0, 300000);
 
         $pingTube = $this->makePingTubeName(self::class);
         $params = ['Operation' => 'Add', 'Filter' => 'UserEvent: '.$pingTube];
@@ -893,11 +1222,46 @@ class WorkerActiveCalls extends WorkerBase
                 return;
             }
             $endpoint = self::getEndpointName($channel);
-            unset($this->activeChannels[$linkedId][$channel]);
+
+            // Очистить маппинги для канала
+            unset($this->channelLinkedIds[$channel]);
+            unset($this->pickupChannels[$channel]);
+
+            // Попытка удалить канал из указанного linkedId
+            $foundLinkedId = $linkedId;
+            if (!isset($this->activeChannels[$linkedId][$channel])) {
+                // Linkedid мог измениться (attended transfer, masquerade) — ищем канал во всех linkedId
+                foreach (array_keys($this->activeChannels) as $altLinkedId) {
+                    if (isset($this->activeChannels[$altLinkedId][$channel])) {
+                        $foundLinkedId = $altLinkedId;
+                        break;
+                    }
+                }
+            }
+
+            // Проверяем, был ли удалённый канал src_chan (параллельный вызов на несколько устройств)
+            $wasSrcChan = isset($this->callType[$foundLinkedId]) &&
+                          ($this->callType[$foundLinkedId]['src_chan'] ?? '') === $channel;
+
+            unset($this->activeChannels[$foundLinkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
-            if(empty($this->activeChannels[$linkedId])){
-                unset($this->activeChannels[$linkedId]);
-                unset($this->callType[$linkedId]);
+
+            // Если удалённый канал был src_chan, ищем альтернативный канал с тем же endpoint
+            if ($wasSrcChan && !empty($this->activeChannels[$foundLinkedId])) {
+                foreach ($this->activeChannels[$foundLinkedId] as $altChannel => $altChanData) {
+                    if (self::getEndpointName($altChannel) === $endpoint) {
+                        // Нашли активный канал с тем же endpoint — обновляем src_chan
+                        $this->callType[$foundLinkedId]['src_chan'] = $altChannel;
+                        $this->logger->writeInfo("Updated src_chan from $channel to $altChannel for linkedId $foundLinkedId (parallel dial)");
+                        break;
+                    }
+                }
+            }
+
+            if(empty($this->activeChannels[$foundLinkedId])){
+                unset($this->activeChannels[$foundLinkedId]);
+                unset($this->callType[$foundLinkedId]);
+                unset($this->linkedIdAliases[$foundLinkedId]); // Очистить алиас если linkedId опустел
             }
         }elseif(in_array($event, ['Newchannel','Newstate']) && stripos($parameters['Channel'] ?? '', 'local') === false){
             $linkedId = $parameters['Linkedid'] ?? '';
@@ -918,6 +1282,17 @@ class WorkerActiveCalls extends WorkerBase
             }else{
                 $extension = $parameters['Exten'] ?? '';
                 $inApp = $context === 'applications';
+            }
+
+            // Определение pickup-канала по extension *8XXX
+            if (preg_match('/^\*8(\d+)$/', $extension, $matches)) {
+                $this->channelLinkedIds[$channel] = $linkedId;
+                $this->pickupChannels[$channel] = [
+                    'target_extension' => $matches[1],
+                    'initial_linkedid' => $linkedId,
+                    'pickup_time' => time()
+                ];
+                $this->logger->writeInfo("Pickup channel detected: $channel (*8{$matches[1]}), linkedid=$linkedId");
             }
 
             $chanData = [
@@ -980,8 +1355,122 @@ class WorkerActiveCalls extends WorkerBase
             $linkedId = $parameters['Linkedid'] ?? '';
             $bridgeUniqueid = $parameters['BridgeUniqueid'] ?? '';
             $beChannel = $parameters['Channel'] ?? '';
+            $swapUniqueid = $parameters['SwapUniqueid'] ?? '';
+
             if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
+                // Handle SwapUniqueid - links two linkedIds during call pickup
+                if (!empty($swapUniqueid)) {
+                    $swapLinkedId = '';
+                    foreach ($this->activeChannels as $lid => $channels) {
+                        foreach ($channels as $ch => $chData) {
+                            if (($chData['Uniqueid'] ?? '') === $swapUniqueid) {
+                                $swapLinkedId = $lid;
+                                break 2;
+                            }
+                        }
+                    }
+
+                    if (!empty($swapLinkedId) && $swapLinkedId !== $linkedId) {
+                        $this->linkedIdAliases[$swapLinkedId] = $linkedId;
+                    }
+                }
+
+                // Add channel to bridge first (required for subsequent lookups)
                 $this->activeBridges[$linkedId][$bridgeUniqueid][$beChannel] = $parameters['Timestamp'] ?? time();
+
+                // Обобщённая миграция linkedId: Asterisk может сменить Linkedid канала при входе в бридж
+                // (call pickup *8, interception-bridge, attended transfer и пр.). Если канал уже есть в
+                // activeChannels под другим linkedId — переносим его метаданные сюда, чтобы не создавать
+                // фантомные записи и не ловить Undefined array key в printActiveCalls.
+                // Local-каналы не хранятся в activeChannels, для них проверка бессмысленна.
+                if (stripos($beChannel, 'local/') !== 0 && !isset($this->activeChannels[$linkedId][$beChannel])) {
+                    foreach ($this->activeChannels as $altLinkedId => $altChannels) {
+                        if ($altLinkedId === $linkedId) {
+                            continue;
+                        }
+                        if (isset($altChannels[$beChannel])) {
+                            $this->logger->writeInfo(
+                                "BridgeEnter linkedId change detected: $beChannel migrated from $altLinkedId to $linkedId " .
+                                "(bridge=$bridgeUniqueid, context=" . ($parameters['Context'] ?? '') . ")"
+                            );
+                            $this->migrateChannel($beChannel, $altLinkedId, $linkedId);
+                            $this->channelLinkedIds[$beChannel] = $linkedId;
+                            // Алиас нужен, чтобы findBridgeChannel мог резолвить исторические bridge'и под старым linkedId.
+                            // Не перезаписываем обратный алиас, иначе получим цикл A→B→A в linkedIdAliases.
+                            if (($this->linkedIdAliases[$linkedId] ?? '') !== $altLinkedId) {
+                                $this->linkedIdAliases[$altLinkedId] = $linkedId;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Handle pickup channel entering bridge
+                if (isset($this->pickupChannels[$beChannel])) {
+                    $initialLinkedId = $this->pickupChannels[$beChannel]['initial_linkedid'];
+
+                    // Check if linkedId changed during bridge entry
+                    if ($initialLinkedId !== $linkedId) {
+                        $this->migrateChannel($beChannel, $initialLinkedId, $linkedId);
+                        $this->channelLinkedIds[$beChannel] = $linkedId;
+                    }
+
+                    // Find other linkedIds in the same bridge and create alias
+                    // (Asterisk changes linkedId asynchronously AFTER BridgeEnter,
+                    // so we create the alias proactively)
+                    $aliasCreated = false;
+                    foreach ($this->activeBridges as $lid => $bridges) {
+                        if ($lid === $linkedId || $lid === $initialLinkedId) {
+                            continue;
+                        }
+                        if (isset($bridges[$bridgeUniqueid]) && !empty($bridges[$bridgeUniqueid])) {
+                            $this->linkedIdAliases[$initialLinkedId] = $lid;
+                            if ($initialLinkedId !== $linkedId) {
+                                $this->migrateChannel($beChannel, $linkedId, $lid);
+                            }
+                            $aliasCreated = true;
+                            break;
+                        }
+                    }
+
+                    // Fallback: search by target extension if alias not created
+                    if (!$aliasCreated) {
+                        $targetExtension = $this->pickupChannels[$beChannel]['target_extension'];
+                        foreach ($this->activeChannels as $lid => $channels) {
+                            foreach ($channels as $ch => $chData) {
+                                $endpoint = self::getEndpointName($ch);
+                                if ($endpoint === $targetExtension && $lid !== $linkedId && $lid !== $initialLinkedId) {
+                                    $this->linkedIdAliases[$initialLinkedId] = $lid;
+                                    if ($initialLinkedId !== $linkedId) {
+                                        $this->migrateChannel($beChannel, $linkedId, $lid);
+                                    }
+                                    break 2;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Not a pickup channel: check if bridge contains a pickup channel
+                    // (reverse scenario: pickup channel entered first, normal channel entering now)
+                    foreach ($this->activeBridges as $lid => $bridges) {
+                        if ($lid === $linkedId) {
+                            continue;
+                        }
+                        if (isset($bridges[$bridgeUniqueid])) {
+                            foreach ($bridges[$bridgeUniqueid] as $bridgeChannel => $_) {
+                                if (isset($this->pickupChannels[$bridgeChannel])) {
+                                    $pickupInitialLinkedId = $this->pickupChannels[$bridgeChannel]['initial_linkedid'];
+                                    if ($pickupInitialLinkedId !== $linkedId) {
+                                        $this->linkedIdAliases[$pickupInitialLinkedId] = $linkedId;
+                                        $this->migrateChannel($bridgeChannel, $pickupInitialLinkedId, $linkedId);
+                                        $this->channelLinkedIds[$bridgeChannel] = $linkedId;
+                                        break 2;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }elseif ('ChanSpyStart' === $event){
             $spyerChannel = $parameters['SpyerChannel'] ?? '';
@@ -1126,7 +1615,7 @@ class WorkerActiveCalls extends WorkerBase
         }
         if($event === 'ExtensionStatus'){
             $exten = $parameters['Exten'] ?? '';
-            if(!empty($exten) && isset($this->states[$exten])){
+            if(!empty($exten) && isset($this->states[$exten]) && empty($this->states[$exten]['isQueue'])){
                 $this->states[$exten]['state'] = $parameters['StatusText'] ?? '';
                 $this->logger->writeInfo($parameters,'stateEvents...');
                 $this->printActiveCalls();

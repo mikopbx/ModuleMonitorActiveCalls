@@ -858,6 +858,33 @@ const ModuleMonitorActiveCalls = {
 		this._authTokens.refresh_token = refreshToken;
 		this._authTokens.exp = this.getJwtExp(accessToken);
 	},
+	refreshAuthToken() {
+		const refreshToken = this._authTokens?.refresh_token;
+		if (!refreshToken) {
+			this.requestBackendEnable();
+			return;
+		}
+		$.ajax({
+			url: '/pbxcore/api/module-softphone-backend/v1/auth/refresh',
+			method: 'POST',
+			headers: {
+				'Authorization': 'Bearer ' + refreshToken
+			},
+			success: (response) => {
+				const accessToken = response?.access_token;
+				const newRefreshToken = response?.refresh_token;
+				if (accessToken && newRefreshToken) {
+					this.setAuthTokens(accessToken, newRefreshToken);
+					this.scheduleContactsWsTokenRefresh();
+				} else {
+					this.requestBackendEnable();
+				}
+			},
+			error: () => {
+				this.requestBackendEnable();
+			}
+		});
+	},
 	getJwtExp(token) {
 		try {
 			if (!token || typeof token !== 'string') return 0;
@@ -879,7 +906,6 @@ const ModuleMonitorActiveCalls = {
 		return now + skewSeconds >= exp;
 	},
 	scheduleContactsWsTokenRefresh() {
-		// Proactively refresh token shortly before expiry by re-requesting backendEnable.
 		if (this._contactsWsTokenTimer) {
 			clearTimeout(this._contactsWsTokenTimer);
 			this._contactsWsTokenTimer = null;
@@ -889,8 +915,7 @@ const ModuleMonitorActiveCalls = {
 		const now = Math.floor(Date.now() / 1000);
 		const refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
 		this._contactsWsTokenTimer = setTimeout(() => {
-			// Re-get tokens and reconnect WS
-			this.requestBackendEnable();
+			this.refreshAuthToken();
 		}, refreshInSec * 1000);
 	},
 	scheduleContactsWsReconnect(reason, forceReAuth = false) {

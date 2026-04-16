@@ -152,11 +152,9 @@ class ModuleMonitorActiveCallsController extends BaseController
     public function backandEnableAction() :void
     {
         if (MonitorActiveCallsMain::backendExists()) {
-            // Модуль включен.
-            $api = new ModuleSoftphoneBackendApi();
-            $api->initialize();
-            $this->view->data = $api->createLoginResponse('1', 'admin');
-            $this->view->success = true;
+            $result = ModuleSoftphoneBackendApi::createServiceToken('ModuleMonitorActiveCalls');
+            $this->view->data = $result;
+            $this->view->success = !empty($result['success']);
         }else{
             $this->view->success = false;
             $this->view->data = [];

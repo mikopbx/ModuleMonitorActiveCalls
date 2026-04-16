@@ -93,6 +93,15 @@ class AsteriskManager
      */
     private bool $_loggedIn = false;
 
+    /** @var callable|null Callback invoked periodically when AMI connection is alive and idle */
+    private $onIdleCallback = null;
+
+    /** @var int Timestamp of last idle callback invocation */
+    private int $lastIdleCall = 0;
+
+    /** @var int Minimum interval between idle callback calls (seconds) */
+    private int $idleInterval = 30;
+
     /**
      * Constructor
      *
@@ -553,6 +562,34 @@ class AsteriskManager
     }
 
     /**
+     * Sets socket read timeout.
+     *
+     * @param int $seconds Timeout in seconds
+     * @param int $microseconds Timeout in microseconds (optional)
+     * @return bool True if socket is valid and timeout was set
+     */
+    public function setSocketTimeout(int $seconds, int $microseconds = 0): bool
+    {
+        if (!is_resource($this->socket)) {
+            return false;
+        }
+        return stream_set_timeout($this->socket, $seconds, $microseconds);
+    }
+
+    /**
+     * Wait for a user events.
+     *
+     * @param $allow_timeout bool
+     *
+     * @return array of parameters, empty on timeout
+     */
+    public function setOnIdleCallback(callable $callback, int $interval = 30): void
+    {
+        $this->onIdleCallback = $callback;
+        $this->idleInterval = $interval;
+    }
+
+    /**
      * Wait for a user events.
      *
      * @param $allow_timeout bool
@@ -578,6 +615,11 @@ class AsteriskManager
             }
             if ($type === '' && count($this->ping()) === 0) {
                 $timeout = $allow_timeout;
+            } elseif ($type === '' && $this->onIdleCallback !== null
+                && time() - $this->lastIdleCall >= $this->idleInterval
+            ) {
+                $this->lastIdleCall = time();
+                call_user_func($this->onIdleCallback);
             } elseif (stripos($type, 'event') !== false) {
                 $this->processEvent($parameters);
             }
@@ -813,11 +855,14 @@ class AsteriskManager
      * Get the channels information.
      *
      * @param bool $group Indicates whether to group the channels by Linkedid (optional, default is true).
-     * @return array The channels information.
+     * @return array|null The channels information, or null on AMI communication error.
      */
-    public function GetChannels(bool $group = true): array
+    public function GetChannels(bool $group = true)
     {
         $res      = $this->sendRequestTimeout('CoreShowChannels');
+        if (empty($res)) {
+            return null;
+        }
         $channels = null;
         if (isset($res['data']['CoreShowChannel'])) {
             $channels = $res['data']['CoreShowChannel'];
