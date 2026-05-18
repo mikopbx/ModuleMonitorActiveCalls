@@ -1246,6 +1246,15 @@ class WorkerActiveCalls extends WorkerBase
             unset($this->activeChannels[$foundLinkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
 
+            // Сбросить состояние endpoint в Idle, если у него не осталось активных каналов.
+            // Без этого "Ring"/"Up" висит до следующего ExtensionStatus от Asterisk, а тот
+            // не приходит для коротких pickup-каналов (*8XXX), не меняющих device hint.
+            // isset защищает от автовивификации для не-PEER endpoint'ов (Local, провайдер),
+            // которые не регистрируются в states в Newchannel.
+            if (isset($this->states[$endpoint]) && empty($this->states[$endpoint]['channels'])) {
+                $this->states[$endpoint]['state'] = self::STATE_IDLE;
+            }
+
             // Если удалённый канал был src_chan, ищем альтернативный канал с тем же endpoint
             if ($wasSrcChan && !empty($this->activeChannels[$foundLinkedId])) {
                 foreach ($this->activeChannels[$foundLinkedId] as $altChannel => $altChanData) {
