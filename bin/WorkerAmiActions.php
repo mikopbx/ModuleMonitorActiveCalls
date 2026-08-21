@@ -64,7 +64,7 @@ class WorkerAmiActions extends WorkerBase
      * @param string $events
      * @return CustomAsteriskManager
      */
-    public function getAstManager(string $events = 'on'):CustomAsteriskManager
+    public function getAstManager(string $events = 'off'):CustomAsteriskManager
     {
         $am     = new CustomAsteriskManager();
         $port   = PbxSettings::getValueByKey('AMIPort');

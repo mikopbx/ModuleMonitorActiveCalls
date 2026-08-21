@@ -30,7 +30,6 @@ use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
-use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController AS BackendApiController;
 
 require_once 'Globals.php';
 
@@ -502,7 +501,7 @@ class WorkerActiveCalls extends WorkerBase
             $this->lastPrintHash = $newPrintHash;
             CacheManager::setCacheData('getActiveChannelsV2Action', $callData, self::CACHE_TTL);
             if($this->backendExists) {
-                BackendApiController::publishActiveCalls($callData);
+                MonitorActiveCallsMain::publishActiveCalls($callData);
                 $this->lastNchanPublishTime = time();
             }
             $this->lastPublishedCallData = $callData;
@@ -564,7 +563,7 @@ class WorkerActiveCalls extends WorkerBase
 
             CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
             if ($this->backendExists) {
-                BackendApiController::publishUserStates($this->pendingUserStatesData);
+                MonitorActiveCallsMain::publishUserStates($this->pendingUserStatesData);
                 $this->lastNchanPublishTime = time();
             }
             $this->lastPublishedStatesData = $this->pendingUserStatesData;
@@ -590,10 +589,10 @@ class WorkerActiveCalls extends WorkerBase
         $this->lastNchanPublishTime = time();
 
         if ($this->lastPublishedCallData !== null) {
-            BackendApiController::publishActiveCalls($this->lastPublishedCallData);
+            MonitorActiveCallsMain::publishActiveCalls($this->lastPublishedCallData);
         }
         if ($this->lastPublishedStatesData !== null) {
-            BackendApiController::publishUserStates($this->lastPublishedStatesData);
+            MonitorActiveCallsMain::publishUserStates($this->lastPublishedStatesData);
         }
     }
 

@@ -9,6 +9,8 @@ use MikoPBX\Core\Workers\Cron\WorkerSafeScriptsCore;
 use MikoPBX\Modules\PbxExtensionBase;
 use MikoPBX\Modules\PbxExtensionUtils;
 use MikoPBX\PBXCoreREST\Lib\PBXApiResult;
+use Modules\ModuleSoftphoneBackend\Lib\ClientAPI\ClientActionFactory;
+use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController as LegacyApiController;
 
 class MonitorActiveCallsMain extends PbxExtensionBase
 {
@@ -79,12 +81,56 @@ class MonitorActiveCallsMain extends PbxExtensionBase
 
 
     /**
-     * Checks whether the ModuleSoftphoneBackend module exists and is enabled..
-     * @return bool
+     * Checks whether an enabled ModuleSoftphoneBackend exposes a compatible API.
      */
     public static function backendExists(): bool
     {
-        $result = PbxExtensionModules::findFirstByUniqid("ModuleSoftphoneBackend");
-        return $result !== null && intval($result->disabled ) === 0;
+        return self::getBackendApiClass() !== null;
+    }
+
+    public static function createBackendServiceToken(string $serviceId): array
+    {
+        $backendApiClass = self::getBackendApiClass();
+        return $backendApiClass === null ? [] : $backendApiClass::createServiceToken($serviceId);
+    }
+
+    public static function publishActiveCalls(array $data): void
+    {
+        $backendApiClass = self::getBackendApiClass();
+        if ($backendApiClass !== null) {
+            $backendApiClass::publishActiveCalls($data);
+        }
+    }
+
+    public static function publishUserStates(array $data): void
+    {
+        $backendApiClass = self::getBackendApiClass();
+        if ($backendApiClass !== null) {
+            $backendApiClass::publishUserStates($data);
+        }
+    }
+
+    private static function getBackendApiClass(): ?string
+    {
+        $module = PbxExtensionModules::findFirstByUniqid('ModuleSoftphoneBackend');
+        if ($module === null || intval($module->disabled) !== 0) {
+            return null;
+        }
+
+        $requiredMethods = ['createServiceToken', 'publishActiveCalls', 'publishUserStates'];
+        $apiClasses = [ClientActionFactory::class, LegacyApiController::class];
+        foreach ($apiClasses as $apiClass) {
+            if (!class_exists($apiClass)) {
+                continue;
+            }
+            $missingMethods = array_filter(
+                $requiredMethods,
+                static fn(string $method): bool => !method_exists($apiClass, $method)
+            );
+            if ($missingMethods === []) {
+                return $apiClass;
+            }
+        }
+        return null;
     }
 }

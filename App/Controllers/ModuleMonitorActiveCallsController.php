@@ -23,7 +23,6 @@ use Modules\ModuleMonitorActiveCalls\Models\UsersSettings;
 use Modules\ModuleUsersUI\Lib\Constants;
 use Modules\ModuleUsersUI\Models\AccessGroups;
 use Modules\ModuleUsersUI\Models\UsersCredentials;
-use Modules\ModuleSoftphoneBackend\Lib\RestAPI\Controllers\ApiController as ModuleSoftphoneBackendApi;
 
 class ModuleMonitorActiveCallsController extends BaseController
 {
@@ -152,7 +151,7 @@ class ModuleMonitorActiveCallsController extends BaseController
     public function backandEnableAction() :void
     {
         if (MonitorActiveCallsMain::backendExists()) {
-            $result = ModuleSoftphoneBackendApi::createServiceToken('ModuleMonitorActiveCalls');
+            $result = MonitorActiveCallsMain::createBackendServiceToken('ModuleMonitorActiveCalls');
             $this->view->data = $result;
             $this->view->success = !empty($result['success']);
         }else{
