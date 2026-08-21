@@ -24,6 +24,9 @@ const ModuleMonitorActiveCalls = {
 	executeCallUrl: globalRootUrl + idUrl + "/executeCall",
 	saveUserActionUrl: globalRootUrl + idUrl + "/saveUser",
 	$widget: undefined,
+	_backendTransport: 'polling',
+	_backendRoutes: {},
+	_authTokens: {},
 
 	/**
 	 * Field validation rules
@@ -35,7 +38,6 @@ const ModuleMonitorActiveCalls = {
 	 */
 	initialize() {
 		this.initContactsCache();
-		this.requestBackendEnable();
 
 		$("#nowUser.dropdown.enable").dropdown({
 			onChange: function onChange(value, text, $choice) {
@@ -726,6 +728,7 @@ const ModuleMonitorActiveCalls = {
 		// Окончание форматирования базовой страницы
 		//////
 		this.startPollingActiveCalls();
+		this.requestBackendEnable();
 
 		// Allow settings to be saved after initialization
 		setTimeout(function() {
@@ -836,54 +839,41 @@ const ModuleMonitorActiveCalls = {
 			method: 'POST',
 			onSuccess(response) {
 				console.log('backandEnable response', response);
-				const accessToken = response?.data?.access_token;
-				const refreshToken = response?.data?.refresh_token;
-				if (accessToken && refreshToken) {
-					window[className].setAuthTokens(accessToken, refreshToken);
-					window[className].connectContactsWs();
-					window[className].connectActiveCallsWs();
-				}
+				window[className].applyBackendSession(response?.data || {});
 			},
 			onFailure(response) {
 				console.log('backandEnable failure', response);
+				window[className].startPollingActiveCalls();
 			},
 			onError(errorMessage, element, xhr) {
 				console.log('backandEnable error', errorMessage, xhr);
+				window[className].startPollingActiveCalls();
 			}
 		});
 	},
-	setAuthTokens(accessToken, refreshToken) {
+	applyBackendSession(data) {
+		const transport = String(data?.transport || 'polling');
+		this._backendTransport = transport;
+		this._backendRoutes = data?.routes && typeof data.routes === 'object' ? data.routes : {};
+		const accessToken = data?.access_token;
+		if (transport === 'polling' || !accessToken) {
+			this._authTokens = {};
+			this.startPollingActiveCalls();
+			return;
+		}
+		this.setAuthTokens(accessToken, data?.refresh_token || '', Number(data?.expires_in) || 3600);
+		this.connectContactsWs();
+		this.connectActiveCallsWs();
+	},
+	setAuthTokens(accessToken, refreshToken, expiresIn = 3600) {
 		this._authTokens = this._authTokens || {};
 		this._authTokens.access_token = accessToken;
 		this._authTokens.refresh_token = refreshToken;
-		this._authTokens.exp = this.getJwtExp(accessToken);
+		this._authTokens.exp = this.getJwtExp(accessToken)
+			|| Math.floor(Date.now() / 1000) + Math.max(1, Number(expiresIn) || 3600);
 	},
 	refreshAuthToken() {
-		const refreshToken = this._authTokens?.refresh_token;
-		if (!refreshToken) {
-			this.requestBackendEnable();
-			return;
-		}
-		$.ajax({
-			url: '/pbxcore/api/module-softphone-backend/v1/auth/refresh',
-			method: 'POST',
-			headers: {
-				'Authorization': 'Bearer ' + refreshToken
-			},
-			success: (response) => {
-				const accessToken = response?.access_token;
-				const newRefreshToken = response?.refresh_token;
-				if (accessToken && newRefreshToken) {
-					this.setAuthTokens(accessToken, newRefreshToken);
-					this.scheduleContactsWsTokenRefresh();
-				} else {
-					this.requestBackendEnable();
-				}
-			},
-			error: () => {
-				this.requestBackendEnable();
-			}
-		});
+		this.requestBackendEnable();
 	},
 	getJwtExp(token) {
 		try {
@@ -919,6 +909,7 @@ const ModuleMonitorActiveCalls = {
 		}, refreshInSec * 1000);
 	},
 	scheduleContactsWsReconnect(reason, forceReAuth = false) {
+		if (this._backendTransport === 'polling' || !this._backendRoutes?.contacts) return;
 		if (this._contactsWsReconnectTimer) {
 			clearTimeout(this._contactsWsReconnectTimer);
 			this._contactsWsReconnectTimer = null;
@@ -937,7 +928,8 @@ const ModuleMonitorActiveCalls = {
 	connectContactsWs() {
 		try {
 			const accessToken = this._authTokens?.access_token;
-			if (!accessToken) return;
+			const route = String(this._backendRoutes?.contacts || '').trim();
+			if (!accessToken || !route || this._backendTransport === 'polling') return;
 
 			// Avoid reconnecting if already connected/connecting
 			if (this._contactsWs && (this._contactsWs.readyState === WebSocket.OPEN || this._contactsWs.readyState === WebSocket.CONNECTING)) {
@@ -949,7 +941,7 @@ const ModuleMonitorActiveCalls = {
 			const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
 			const wsHost = window.location.host; // host:port of current page
 			const tokenParam = encodeURIComponent(accessToken);
-			const wsUrl = `${wsProto}://${wsHost}/pbxcore/api/module-softphone-backend/v1/sub/contacts?authorization=${tokenParam}`;
+			const wsUrl = `${wsProto}://${wsHost}${route}?authorization=${tokenParam}`;
 
 			this._contactsWs = new WebSocket(wsUrl);
 			this._contactsWs.onopen = () => {
@@ -983,6 +975,10 @@ const ModuleMonitorActiveCalls = {
 		}
 	},
 	scheduleActiveCallsWsReconnect(reason, forceReAuth = false) {
+		if (this._backendTransport === 'polling' || !this._backendRoutes?.active_calls) {
+			this.startPollingActiveCalls();
+			return;
+		}
 		if (this._activeCallsWsReconnectTimer) {
 			clearTimeout(this._activeCallsWsReconnectTimer);
 			this._activeCallsWsReconnectTimer = null;
@@ -1001,7 +997,11 @@ const ModuleMonitorActiveCalls = {
 	connectActiveCallsWs() {
 		try {
 			const accessToken = this._authTokens?.access_token;
-			if (!accessToken) return;
+			const route = String(this._backendRoutes?.active_calls || '').trim();
+			if (!accessToken || !route || this._backendTransport === 'polling') {
+				this.startPollingActiveCalls();
+				return;
+			}
 
 			// Avoid reconnecting if already connected/connecting
 			if (this._activeCallsWs && (this._activeCallsWs.readyState === WebSocket.OPEN || this._activeCallsWs.readyState === WebSocket.CONNECTING)) {
@@ -1010,17 +1010,15 @@ const ModuleMonitorActiveCalls = {
 			// Reset backoff on explicit connect attempt
 			this._activeCallsWsReconnectAttempt = 0;
 
-			// Token exists -> use WS, disable polling fallback
-			this.stopPollingActiveCalls();
-
 			const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
 			const wsHost = window.location.host; // host:port of current page
 			const tokenParam = encodeURIComponent(accessToken);
-			const wsUrl = `${wsProto}://${wsHost}/pbxcore/api/module-softphone-backend/v1/sub/active-calls?authorization=${tokenParam}`;
+			const wsUrl = `${wsProto}://${wsHost}${route}?authorization=${tokenParam}`;
 
 			this._activeCallsWs = new WebSocket(wsUrl);
 			this._activeCallsWs.onopen = () => {
 				console.log('active-calls ws connected');
+				this.stopPollingActiveCalls();
 				// Reuse the same token refresh timer (it triggers requestBackendEnable)
 				this.scheduleContactsWsTokenRefresh();
 			};
@@ -1029,11 +1027,14 @@ const ModuleMonitorActiveCalls = {
 			};
 			this._activeCallsWs.onerror = (event) => {
 				console.log('active-calls ws error', event);
+				this.startPollingActiveCalls();
+				this.scheduleActiveCallsWsReconnect('error', this.isAccessTokenExpired(0));
 			};
 			this._activeCallsWs.onclose = (event) => {
 				const code = event?.code;
 				const reason = event?.reason;
 				console.log('active-calls ws closed', { code, reason });
+				this.startPollingActiveCalls();
 
 				// Auth closes vary by server implementation.
 				const authCloseCodes = new Set([1008, 4001, 4401, 4403]);
@@ -1042,6 +1043,7 @@ const ModuleMonitorActiveCalls = {
 			};
 		} catch (e) {
 			console.log('active-calls ws init error', e);
+			this.startPollingActiveCalls();
 			this.scheduleActiveCallsWsReconnect('init_error', this.isAccessTokenExpired(0));
 		}
 	},
@@ -1215,4 +1217,3 @@ const ModuleMonitorActiveCalls = {
 $(document).ready(() => {
 	window[className].initialize();
 });
-

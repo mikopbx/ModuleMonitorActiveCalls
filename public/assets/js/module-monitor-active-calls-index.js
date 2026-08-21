@@ -1,26 +1,3 @@
-"use strict";
-
-function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
-function _regenerator() { /*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */ var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
-function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
-function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
-function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
-function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
-function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
-function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
-function _createForOfIteratorHelper(r, e) { var t = "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (!t) { if (Array.isArray(r) || (t = _unsupportedIterableToArray(r)) || e && r && "number" == typeof r.length) { t && (r = t); var _n = 0, F = function F() {}; return { s: F, n: function n() { return _n >= r.length ? { done: !0 } : { done: !1, value: r[_n++] }; }, e: function e(r) { throw r; }, f: F }; } throw new TypeError("Invalid attempt to iterate non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); } var o, a = !0, u = !1; return { s: function s() { t = t.call(r); }, n: function n() { var r = t.next(); return a = r.done, r; }, e: function e(r) { u = !0, o = r; }, f: function f() { try { a || null == t.return || t.return(); } finally { if (u) throw o; } } }; }
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
-function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
-function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
-function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
-function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 /*
  * Copyright (C) MIKO LLC - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
@@ -28,13 +5,13 @@ function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
  * Written by Nikolay Beketov, 11 2018
  *
  */
-var idUrl = 'module-monitor-active-calls';
-var idForm = 'module-monitor-active-calls-form';
-var className = 'ModuleMonitorActiveCalls';
-var inputClassName = 'mikopbx-module-input';
+const idUrl = 'module-monitor-active-calls';
+const idForm = 'module-monitor-active-calls-form';
+const className = 'ModuleMonitorActiveCalls';
+const inputClassName = 'mikopbx-module-input';
 
 /* global $, globalRootUrl, globalTranslate, Form, Config, Vue, Extensions */
-var ModuleMonitorActiveCalls = {
+const ModuleMonitorActiveCalls = {
   isInit: true,
   contactsCacheTtlMs: 120 * 60 * 1000,
   queuesFilterSelector: '#queuesFilter',
@@ -47,6 +24,9 @@ var ModuleMonitorActiveCalls = {
   executeCallUrl: globalRootUrl + idUrl + "/executeCall",
   saveUserActionUrl: globalRootUrl + idUrl + "/saveUser",
   $widget: undefined,
+  _backendTransport: 'polling',
+  _backendRoutes: {},
+  _authTokens: {},
   /**
    * Field validation rules
    * https://semantic-ui.com/behaviors/form.html
@@ -55,9 +35,8 @@ var ModuleMonitorActiveCalls = {
   /**
    * On page load we init some Semantic UI library
    */
-  initialize: function initialize() {
+  initialize() {
     this.initContactsCache();
-    this.requestBackendEnable();
     $("#nowUser.dropdown.enable").dropdown({
       onChange: function onChange(value, text, $choice) {
         window[className].onChangeSetting('adminUserId', value);
@@ -69,12 +48,12 @@ var ModuleMonitorActiveCalls = {
         window[className].onChangeSetting('minWaitVisible', value);
       }
     });
-    var userNumber = $('#userNumber').val();
+    let userNumber = $('#userNumber').val();
     window[className].$widgetQueues = new Vue({
       el: '#app-queue',
       delimiters: ["<%", "%>"],
       methods: {
-        updatedCallsFromResponse: function updatedCallsFromResponse(data) {
+        updatedCallsFromResponse(data) {
           // Keep last payload to allow re-render on queue switch (WS mode).
           this.lastActiveCallsPayload = data;
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
@@ -89,7 +68,7 @@ var ModuleMonitorActiveCalls = {
             this.normalizeAgentCards();
           });
         },
-        initQueuesFilter: function initQueuesFilter() {
+        initQueuesFilter() {
           var self = this;
           var $filter = $(window[className].queuesFilterSelector);
           if ($filter.length === 0) return;
@@ -122,7 +101,7 @@ var ModuleMonitorActiveCalls = {
               $filter.data('initialized', true);
               $filter.dropdown({
                 fullTextSearch: true,
-                onChange: function onChange(value) {
+                onChange: function (value) {
                   // Skip onChange during programmatic refresh
                   if ($filter.data('refreshing')) {
                     return;
@@ -156,22 +135,22 @@ var ModuleMonitorActiveCalls = {
             }
           });
         },
-        refreshFromLastPayload: function refreshFromLastPayload() {
+        refreshFromLastPayload() {
           if (this.lastActiveCallsPayload) {
             this.updatedCallsFromResponse(this.lastActiveCallsPayload);
           }
         },
-        getQueueCalls: function getQueueCalls(queueId) {
+        getQueueCalls(queueId) {
           var queue = this.queues[queueId];
           if (!queue) return [];
           return Array.isArray(queue.calls) ? queue.calls : [];
         },
-        getQueueAgentsList: function getQueueAgentsList(queueId) {
+        getQueueAgentsList(queueId) {
           var queue = this.queues[queueId];
           if (!queue || !queue.agents) return [];
           return this.buildAgentsList(queue.agents);
         },
-        hasWaitingCalls: function hasWaitingCalls(queueId) {
+        hasWaitingCalls(queueId) {
           var calls = this.getQueueCalls(queueId);
           var self = this;
           for (var i = 0; i < calls.length; i++) {
@@ -185,18 +164,16 @@ var ModuleMonitorActiveCalls = {
           }
           return false;
         },
-        buildAgentsList: function buildAgentsList(agentsObj) {
-          var entries = Object.entries(agentsObj || {});
-          var available = [];
-          var unavailable = [];
-          for (var _i = 0, _entries = entries; _i < _entries.length; _i++) {
-            var _entries$_i = _slicedToArray(_entries[_i], 2),
-              number = _entries$_i[0],
-              agent = _entries$_i[1];
-            var state = (agent === null || agent === void 0 ? void 0 : agent.state) || '';
-            var item = _objectSpread({
-              number: number
-            }, agent);
+        buildAgentsList(agentsObj) {
+          const entries = Object.entries(agentsObj || {});
+          const available = [];
+          const unavailable = [];
+          for (const [number, agent] of entries) {
+            const state = agent?.state || '';
+            const item = {
+              number,
+              ...agent
+            };
             if (state === 'Unavailable') {
               unavailable.push(item);
             } else {
@@ -205,15 +182,15 @@ var ModuleMonitorActiveCalls = {
           }
           return available.concat(unavailable);
         },
-        normalizePhone10: function normalizePhone10(phone) {
-          var digits = String(phone || '').replace(/\D+/g, '');
+        normalizePhone10(phone) {
+          const digits = String(phone || '').replace(/\D+/g, '');
           if (digits.length <= 10) return digits;
           return digits.slice(-10);
         },
-        updateContactFromWs: function updateContactFromWs(contact) {
-          var phone10 = this.normalizePhone10(contact === null || contact === void 0 ? void 0 : contact.number);
+        updateContactFromWs(contact) {
+          const phone10 = this.normalizePhone10(contact?.number);
           if (!phone10) return;
-          var displayName = String((contact === null || contact === void 0 ? void 0 : contact.client) || (contact === null || contact === void 0 ? void 0 : contact.contact) || '').trim();
+          const displayName = String(contact?.client || contact?.contact || '').trim();
           if (!displayName) return;
           // Vue2: ensure reactivity for new keys
           if (this.$set) {
@@ -222,24 +199,24 @@ var ModuleMonitorActiveCalls = {
             this.contactsByPhone10[phone10] = displayName;
           }
         },
-        getClientNameByPhone: function getClientNameByPhone(phone) {
-          var phone10 = this.normalizePhone10(phone);
+        getClientNameByPhone(phone) {
+          const phone10 = this.normalizePhone10(phone);
           return this.contactsByPhone10[phone10] || '';
         },
-        getClientHeader: function getClientHeader(phone) {
-          var client = this.getClientNameByPhone(phone);
+        getClientHeader(phone) {
+          const client = this.getClientNameByPhone(phone);
           if (!client) return phone;
-          return "".concat(client, " <").concat(phone, ">");
+          return `${client} <${phone}>`;
         },
-        hasClientByPhone: function hasClientByPhone(phone) {
+        hasClientByPhone(phone) {
           return !!this.getClientNameByPhone(phone);
         },
-        formatElapsedTime: function formatElapsedTime(enterTime) {
+        formatElapsedTime(enterTime) {
           // Make this method reactive to the UI ticker.
           void this.nowTick;
           return window[className].formatElapsedTime(enterTime);
         },
-        normalizeAgentCards: function normalizeAgentCards() {
+        normalizeAgentCards() {
           if (!this.$el) return;
           var self = this;
 
@@ -315,47 +292,43 @@ var ModuleMonitorActiveCalls = {
             });
           });
         },
-        adjustAgentCardsGap: function adjustAgentCardsGap() {
+        adjustAgentCardsGap() {
           if (!this.$el) return;
-          var container = this.$el.querySelector('.ui.cards.agent-cards');
+          const container = this.$el.querySelector('.ui.cards.agent-cards');
           if (!container) return;
-          var cards = Array.from(container.querySelectorAll('.ui.card.agent-card'));
+          const cards = Array.from(container.querySelectorAll('.ui.card.agent-card'));
           if (!cards.length) return;
-          var tallCard = cards.find(function (c) {
-            return c.querySelector('.meta.agent-peer');
-          });
-          var shortCard = cards.find(function (c) {
-            return !c.querySelector('.meta.agent-peer');
-          });
+          const tallCard = cards.find(c => c.querySelector('.meta.agent-peer'));
+          const shortCard = cards.find(c => !c.querySelector('.meta.agent-peer'));
           if (!tallCard || !shortCard) return;
-          var ht = tallCard.getBoundingClientRect().height;
-          var hs = shortCard.getBoundingClientRect().height;
+          const ht = tallCard.getBoundingClientRect().height;
+          const hs = shortCard.getBoundingClientRect().height;
           if (!ht || !hs) return;
 
           // From 2*(hs+g) = ht+g => g = ht - 2*hs
-          var gap = ht - 2 * hs;
+          let gap = ht - 2 * hs;
           if (!Number.isFinite(gap)) return;
 
           // Clamp to sane range; negative means "no extra gap needed".
           gap = Math.max(0, Math.min(20, Math.round(gap)));
-          container.style.setProperty('--agent-card-gap', "".concat(gap, "px"));
+          container.style.setProperty('--agent-card-gap', `${gap}px`);
         },
-        adjustAgentCardsColumnCount: function adjustAgentCardsColumnCount() {
+        adjustAgentCardsColumnCount() {
           if (!this.$el) return;
-          var container = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-masonry');
+          const container = this.$el.querySelector('.ui.cards.agent-cards.agent-cards-masonry');
           if (!container) return;
-          var w = container.clientWidth;
+          const w = container.clientWidth;
           if (!w) return;
 
           // Minimum acceptable card width in px (tune if needed)
-          var minCardWidth = 150;
-          var cs = window.getComputedStyle(container);
-          var gapRaw = cs.columnGap || cs.getPropertyValue('column-gap') || '16px';
-          var gapPx = parseFloat(gapRaw) || 16;
-          var count = Math.max(1, Math.min(12, Math.floor((w + gapPx) / (minCardWidth + gapPx))));
+          const minCardWidth = 150;
+          const cs = window.getComputedStyle(container);
+          const gapRaw = cs.columnGap || cs.getPropertyValue('column-gap') || '16px';
+          const gapPx = parseFloat(gapRaw) || 16;
+          const count = Math.max(1, Math.min(12, Math.floor((w + gapPx) / (minCardWidth + gapPx))));
           container.style.setProperty('--agent-card-col-count', String(count));
         },
-        ensureAgentCardsGridMasonry: function ensureAgentCardsGridMasonry() {
+        ensureAgentCardsGridMasonry() {
           var self = this;
           var styleId = 'agent-cards-layout-style';
           var styleEl = document.getElementById(styleId);
@@ -400,7 +373,7 @@ var ModuleMonitorActiveCalls = {
             });
           }
         },
-        layoutAgentCardsGridMasonry: function layoutAgentCardsGridMasonry() {
+        layoutAgentCardsGridMasonry() {
           if (!this.$el) return;
           var self = this;
 
@@ -410,7 +383,7 @@ var ModuleMonitorActiveCalls = {
             self.layoutSingleGridMasonry(grid);
           });
         },
-        layoutSingleGridMasonry: function layoutSingleGridMasonry(grid) {
+        layoutSingleGridMasonry(grid) {
           if (!grid) return;
           var cs = window.getComputedStyle(grid);
           var rowHeight = parseFloat(cs.getPropertyValue('grid-auto-rows')) || 1;
@@ -472,57 +445,42 @@ var ModuleMonitorActiveCalls = {
             item.style.gridRowEnd = 'span ' + span;
           });
         },
-        getSrcNumForAgent: function getSrcNumForAgent(agentNumber) {
-          var result = '-';
-          var answeredFound = false;
-          var _iterator = _createForOfIteratorHelper(this.allCalls),
-            _step;
-          try {
-            for (_iterator.s(); !(_step = _iterator.n()).done;) {
-              var call = _step.value;
-              if (call.dst_num === agentNumber) {
-                answeredFound = true;
+        getSrcNumForAgent(agentNumber) {
+          let result = '-';
+          let answeredFound = false;
+          for (const call of this.allCalls) {
+            if (call.dst_num === agentNumber) {
+              answeredFound = true;
+              result = call.src_num;
+              break;
+            }
+            if (call.calledChannels && Array.isArray(call.calledChannels)) {
+              const match = call.calledChannels.find(ch => ch.number === agentNumber);
+              if (match) {
                 result = call.src_num;
-                break;
-              }
-              if (call.calledChannels && Array.isArray(call.calledChannels)) {
-                var _match2 = call.calledChannels.find(function (ch) {
-                  return ch.number === agentNumber;
-                });
-                if (_match2) {
-                  result = call.src_num;
-                }
-              }
-              if (call.bridgeChannels && Array.isArray(call.bridgeChannels)) {
-                var _match3 = call.bridgeChannels.find(function (ch) {
-                  return ch.src_num === agentNumber || ch.dst_num === agentNumber;
-                });
-                if (_match3) {
-                  if (_match3.src_num === agentNumber) {
-                    result = _match3.dst_num;
-                  } else {
-                    result = _match3.src_num;
-                  }
-                  answeredFound = true;
-                }
               }
             }
-          } catch (err) {
-            _iterator.e(err);
-          } finally {
-            _iterator.f();
+            if (call.bridgeChannels && Array.isArray(call.bridgeChannels)) {
+              const match = call.bridgeChannels.find(ch => ch.src_num === agentNumber || ch.dst_num === agentNumber);
+              if (match) {
+                if (match.src_num === agentNumber) {
+                  result = match.dst_num;
+                } else {
+                  result = match.src_num;
+                }
+                answeredFound = true;
+              }
+            }
           }
           if (answeredFound === false) {
-            for (var i = 0; i < this.allCalls.length; i++) {
-              var tmpCall = this.allCalls[i];
+            for (let i = 0; i < this.allCalls.length; i++) {
+              const tmpCall = this.allCalls[i];
               if (tmpCall.src_num === agentNumber) {
                 // Исходящий
                 if (tmpCall.dst_num === '') {
                   // не ответа, дозвон.
                   if (tmpCall.calledChannels && Array.isArray(tmpCall.calledChannels) && tmpCall.calledChannels.length) {
-                    var match = tmpCall.calledChannels.find(function (ch) {
-                      return ch.number !== agentNumber;
-                    });
+                    const match = tmpCall.calledChannels.find(ch => ch.number !== agentNumber);
                     if (match) {
                       result = match.number;
                     }
@@ -543,10 +501,8 @@ var ModuleMonitorActiveCalls = {
                 break;
               } else {
                 if (tmpCall.calledChannels && Array.isArray(tmpCall.calledChannels)) {
-                  var _match = tmpCall.calledChannels.find(function (ch) {
-                    return ch.number === agentNumber;
-                  });
-                  if (_match) {
+                  const match = tmpCall.calledChannels.find(ch => ch.number === agentNumber);
+                  if (match) {
                     result = tmpCall.src_num;
                   }
                 }
@@ -555,18 +511,18 @@ var ModuleMonitorActiveCalls = {
           }
           return result;
         },
-        hasPeerPhone: function hasPeerPhone(agentNumber) {
-          var phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+        hasPeerPhone(agentNumber) {
+          const phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
           return phone !== '' && phone !== '-' && phone !== '—';
         },
-        getPeerPhoneLabel: function getPeerPhoneLabel(agentNumber) {
-          var phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
+        getPeerPhoneLabel(agentNumber) {
+          const phone = String(this.getSrcNumForAgent(agentNumber) || '').trim();
           return this.hasPeerPhone(agentNumber) ? phone : '—';
         },
-        getPeerNameLabel: function getPeerNameLabel(agentNumber) {
+        getPeerNameLabel(agentNumber) {
           // Use cached contacts (WS + IndexedDB) to show client name for peer phone.
-          var phone = this.getPeerPhoneLabel(agentNumber);
-          var client = this.getClientNameByPhone(phone);
+          const phone = this.getPeerPhoneLabel(agentNumber);
+          const client = this.getClientNameByPhone(phone);
           return client || '—';
         }
       },
@@ -592,69 +548,68 @@ var ModuleMonitorActiveCalls = {
         calls: []
       },
       methods: {
-        callIsVisible: function callIsVisible(call) {
+        callIsVisible(call) {
           void this.nowTick;
           if (call.dst_chan === '' && call.queueData.EnterTime !== undefined) {
             return this.minWaitVisible <= this.getWaitTime(call);
           }
           return true;
         },
-        formatTimestampToTime: function formatTimestampToTime(timestamp) {
+        formatTimestampToTime(timestamp) {
           // Если timestamp строка — приводим к числу
-          var ts = typeof timestamp === 'string' ? parseFloat(timestamp) : timestamp;
+          const ts = typeof timestamp === 'string' ? parseFloat(timestamp) : timestamp;
 
           // Если timestamp в секундах (меньше 1e10), умножаем на 1000
-          var ms = ts < 1e10 ? ts * 1000 : ts;
-          var date = new Date(ms);
-          var hours = String(date.getHours()).padStart(2, '0');
-          var minutes = String(date.getMinutes()).padStart(2, '0');
-          var seconds = String(date.getSeconds()).padStart(2, '0');
-          return "".concat(hours, ":").concat(minutes, ":").concat(seconds);
+          const ms = ts < 1e10 ? ts * 1000 : ts;
+          const date = new Date(ms);
+          const hours = String(date.getHours()).padStart(2, '0');
+          const minutes = String(date.getMinutes()).padStart(2, '0');
+          const seconds = String(date.getSeconds()).padStart(2, '0');
+          return `${hours}:${minutes}:${seconds}`;
         },
-        getWaitTime: function getWaitTime(call) {
+        getWaitTime(call) {
           void this.nowTick;
-          var answer = Math.floor(Date.now() / 1000);
+          let answer = Math.floor(Date.now() / 1000);
           if (call.answer !== '') {
             answer = call.answer;
           }
           return window[className].secondToTime(answer - call.start);
         },
-        getCallTime: function getCallTime(call) {
+        getCallTime(call) {
           void this.nowTick;
           if (call.answer === '') {
             return '-';
           }
           return window[className].formatElapsedTime(call.answer);
         },
-        updatedCallsFromResponse: function updatedCallsFromResponse(data) {
+        updatedCallsFromResponse(data) {
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
           // Проходим по всем очередям
-          for (var queueId in data.queues) {
-            var queue = data.queues[queueId];
+          for (const queueId in data.queues) {
+            const queue = data.queues[queueId];
             // Проверяем, есть ли у очереди поле calls и является ли оно массивом
             if (Array.isArray(queue.calls)) {
-              var _data$calls;
               // Добавляем все вызовы из этой очереди в общий массив
-              (_data$calls = data.calls).push.apply(_data$calls, _toConsumableArray(queue.calls));
+              data.calls.push(...queue.calls);
             }
           }
           this.calls = data.calls;
-          this.$nextTick(function () {
+          this.$nextTick(() => {
             Extensions.updatePhonesRepresent('need-update');
           });
         },
-        formatElapsedTime: function formatElapsedTime(enterTime) {
+        formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
         },
-        getClientHeader: function getClientHeader(phone) {
-          var q = window[className].$widgetQueues;
+        getClientHeader(phone) {
+          const q = window[className].$widgetQueues;
           if (q && typeof q.getClientHeader === 'function') {
             return q.getClientHeader(phone);
           }
           return phone;
         },
-        hangupAction: function hangupAction(event) {
-          var target = $(event.target);
+        hangupAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -664,8 +619,8 @@ var ModuleMonitorActiveCalls = {
             ch2: target.attr('data-ch2')
           });
         },
-        joinAction: function joinAction(event) {
-          var target = $(event.target);
+        joinAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -679,15 +634,15 @@ var ModuleMonitorActiveCalls = {
             number: this.userNumber
           });
         },
-        whisperAction: function whisperAction(event) {
-          var target = $(event.target);
+        whisperAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
           if (this.userNumber === '') {
             return;
           }
-          var spChannel = target.attr('data-ch1');
+          let spChannel = target.attr('data-ch1');
           if ('incoming' === target.attr('data-call-type')) {
             spChannel = target.attr('data-ch2');
           }
@@ -698,8 +653,8 @@ var ModuleMonitorActiveCalls = {
             number: this.userNumber
           });
         },
-        listenAction: function listenAction(event) {
-          var target = $(event.target);
+        listenAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -724,14 +679,14 @@ var ModuleMonitorActiveCalls = {
         calls: []
       },
       methods: {
-        updatedCallsFromResponse: function updatedCallsFromResponse(lines) {
+        updatedCallsFromResponse(lines) {
           this.calls = lines;
-          this.$nextTick(function () {
+          this.$nextTick(() => {
             Extensions.updatePhonesRepresent('need-update');
           });
         },
-        hangupAction: function hangupAction(event) {
-          var target = $(event.target);
+        hangupAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -741,8 +696,8 @@ var ModuleMonitorActiveCalls = {
             ch2: target.attr('data-ch2')
           });
         },
-        joinAction: function joinAction(event) {
-          var target = $(event.target);
+        joinAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -756,15 +711,15 @@ var ModuleMonitorActiveCalls = {
             number: this.userNumber
           });
         },
-        whisperAction: function whisperAction(event) {
-          var target = $(event.target);
+        whisperAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
           if (this.userNumber === '') {
             return;
           }
-          var spChannel = target.attr('data-ch1');
+          let spChannel = target.attr('data-ch1');
           if ('incoming' === target.attr('data-call-type')) {
             spChannel = target.attr('data-ch2');
           }
@@ -775,8 +730,8 @@ var ModuleMonitorActiveCalls = {
             number: this.userNumber
           });
         },
-        listenAction: function listenAction(event) {
-          var target = $(event.target);
+        listenAction(event) {
+          let target = $(event.target);
           if (target.attr('data-ch1') === undefined) {
             target = $(event.target).parent();
           }
@@ -805,16 +760,17 @@ var ModuleMonitorActiveCalls = {
     // Окончание форматирования базовой страницы
     //////
     this.startPollingActiveCalls();
+    this.requestBackendEnable();
 
     // Allow settings to be saved after initialization
     setTimeout(function () {
       window[className].isInit = false;
     }, 1000);
   },
-  startUiTicker: function startUiTicker() {
+  startUiTicker() {
     if (this._uiTicker) return;
-    this._uiTicker = setInterval(function () {
-      var now = Date.now();
+    this._uiTicker = setInterval(() => {
+      const now = Date.now();
       if (window[className].$widgetQueues) {
         window[className].$widgetQueues.nowTick = now;
       }
@@ -823,49 +779,29 @@ var ModuleMonitorActiveCalls = {
       }
     }, 1000);
   },
-  startPollingActiveCalls: function startPollingActiveCalls() {
+  startPollingActiveCalls() {
     if (this._activeCallsPollTimer) return;
     window[className].updateLines();
     this._activeCallsPollTimer = setInterval(window[className].updateLines, 2000);
   },
-  stopPollingActiveCalls: function stopPollingActiveCalls() {
+  stopPollingActiveCalls() {
     if (!this._activeCallsPollTimer) return;
     clearInterval(this._activeCallsPollTimer);
     this._activeCallsPollTimer = null;
   },
-  initContactsCache: function initContactsCache() {
-    var _this = this;
-    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
-      var _t;
-      return _regenerator().w(function (_context) {
-        while (1) switch (_context.p = _context.n) {
-          case 0:
-            _context.p = 0;
-            _context.n = 1;
-            return _this.idbLoadAllContacts();
-          case 1:
-            _this._contactsCacheByPhone10 = _context.v;
-            _this.applyContactsCacheToQueueWidget();
-            _context.n = 3;
-            break;
-          case 2:
-            _context.p = 2;
-            _t = _context.v;
-            console.log('contacts cache init error', _t);
-            _this._contactsCacheByPhone10 = {};
-          case 3:
-            return _context.a(2);
-        }
-      }, _callee, null, [[0, 2]]);
-    }))();
+  async initContactsCache() {
+    try {
+      this._contactsCacheByPhone10 = await this.idbLoadAllContacts();
+      this.applyContactsCacheToQueueWidget();
+    } catch (e) {
+      console.log('contacts cache init error', e);
+      this._contactsCacheByPhone10 = {};
+    }
   },
-  applyContactsCacheToQueueWidget: function applyContactsCacheToQueueWidget() {
+  applyContactsCacheToQueueWidget() {
     if (!this._contactsCacheByPhone10) return;
     if (!window[className].$widgetQueues) return;
-    for (var _i2 = 0, _Object$entries = Object.entries(this._contactsCacheByPhone10); _i2 < _Object$entries.length; _i2++) {
-      var _Object$entries$_i = _slicedToArray(_Object$entries[_i2], 2),
-        phone10 = _Object$entries$_i[0],
-        client = _Object$entries$_i[1];
+    for (const [phone10, client] of Object.entries(this._contactsCacheByPhone10)) {
       if (window[className].$widgetQueues.$set) {
         window[className].$widgetQueues.$set(window[className].$widgetQueues.contactsByPhone10, phone10, client);
       } else {
@@ -873,247 +809,187 @@ var ModuleMonitorActiveCalls = {
       }
     }
   },
-  idbOpenContactsDb: function idbOpenContactsDb() {
-    return new Promise(function (resolve, reject) {
+  idbOpenContactsDb() {
+    return new Promise((resolve, reject) => {
       try {
-        var req = indexedDB.open('ModuleMonitorActiveCalls', 1);
-        req.onupgradeneeded = function () {
-          var db = req.result;
+        const req = indexedDB.open('ModuleMonitorActiveCalls', 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
           if (!db.objectStoreNames.contains('contactsByPhone10')) {
             db.createObjectStore('contactsByPhone10', {
               keyPath: 'phone10'
             });
           }
         };
-        req.onsuccess = function () {
-          return resolve(req.result);
-        };
-        req.onerror = function () {
-          return reject(req.error);
-        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
       } catch (e) {
         reject(e);
       }
     });
   },
-  idbPutContact: function idbPutContact(phone10, client) {
-    var _this2 = this;
-    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2() {
-      var db;
-      return _regenerator().w(function (_context2) {
-        while (1) switch (_context2.n) {
-          case 0:
-            _context2.n = 1;
-            return _this2.idbOpenContactsDb();
-          case 1:
-            db = _context2.v;
-            return _context2.a(2, new Promise(function (resolve, reject) {
-              var tx = db.transaction('contactsByPhone10', 'readwrite');
-              var store = tx.objectStore('contactsByPhone10');
-              store.put({
-                phone10: phone10,
-                client: client,
-                updatedAt: Date.now()
-              });
-              tx.oncomplete = function () {
-                db.close();
-                resolve();
-              };
-              tx.onerror = function () {
-                var err = tx.error;
-                db.close();
-                reject(err);
-              };
-            }));
-        }
-      }, _callee2);
-    }))();
+  async idbPutContact(phone10, client) {
+    const db = await this.idbOpenContactsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('contactsByPhone10', 'readwrite');
+      const store = tx.objectStore('contactsByPhone10');
+      store.put({
+        phone10,
+        client,
+        updatedAt: Date.now()
+      });
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        const err = tx.error;
+        db.close();
+        reject(err);
+      };
+    });
   },
-  idbLoadAllContacts: function idbLoadAllContacts() {
-    var _this3 = this;
-    return _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee3() {
-      var db;
-      return _regenerator().w(function (_context3) {
-        while (1) switch (_context3.n) {
-          case 0:
-            _context3.n = 1;
-            return _this3.idbOpenContactsDb();
-          case 1:
-            db = _context3.v;
-            return _context3.a(2, new Promise(function (resolve, reject) {
-              var tx = db.transaction('contactsByPhone10', 'readwrite');
-              var store = tx.objectStore('contactsByPhone10');
-              var req = store.getAll();
-              req.onsuccess = function () {
-                var map = {};
-                var now = Date.now();
-                var ttlMs = Number(_this3.contactsCacheTtlMs) || 120 * 60 * 1000;
-                var _iterator2 = _createForOfIteratorHelper(req.result || []),
-                  _step2;
-                try {
-                  for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
-                    var row = _step2.value;
-                    var phone10 = row === null || row === void 0 ? void 0 : row.phone10;
-                    var client = row === null || row === void 0 ? void 0 : row.client;
-                    var updatedAt = Number(row === null || row === void 0 ? void 0 : row.updatedAt) || 0;
-                    var isFresh = phone10 && client && updatedAt > 0 && now - updatedAt <= ttlMs;
-                    if (isFresh) {
-                      map[phone10] = client;
-                    } else if (phone10) {
-                      // Cleanup expired/broken records
-                      try {
-                        store.delete(phone10);
-                      } catch (e) {/* ignore */}
-                    }
-                  }
-                } catch (err) {
-                  _iterator2.e(err);
-                } finally {
-                  _iterator2.f();
-                }
-                tx.oncomplete = function () {
-                  db.close();
-                  resolve(map);
-                };
-                tx.onerror = function () {
-                  var err = tx.error;
-                  db.close();
-                  reject(err);
-                };
-              };
-              req.onerror = function () {
-                var err = req.error;
-                db.close();
-                reject(err);
-              };
-            }));
+  async idbLoadAllContacts() {
+    const db = await this.idbOpenContactsDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('contactsByPhone10', 'readwrite');
+      const store = tx.objectStore('contactsByPhone10');
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const map = {};
+        const now = Date.now();
+        const ttlMs = Number(this.contactsCacheTtlMs) || 120 * 60 * 1000;
+        for (const row of req.result || []) {
+          const phone10 = row?.phone10;
+          const client = row?.client;
+          const updatedAt = Number(row?.updatedAt) || 0;
+          const isFresh = phone10 && client && updatedAt > 0 && now - updatedAt <= ttlMs;
+          if (isFresh) {
+            map[phone10] = client;
+          } else if (phone10) {
+            // Cleanup expired/broken records
+            try {
+              store.delete(phone10);
+            } catch (e) {/* ignore */}
+          }
         }
-      }, _callee3);
-    }))();
+        tx.oncomplete = () => {
+          db.close();
+          resolve(map);
+        };
+        tx.onerror = () => {
+          const err = tx.error;
+          db.close();
+          reject(err);
+        };
+      };
+      req.onerror = () => {
+        const err = req.error;
+        db.close();
+        reject(err);
+      };
+    });
   },
-  requestBackendEnable: function requestBackendEnable() {
+  requestBackendEnable() {
     $.api({
       url: window[className].backendEnableUrl,
       on: 'now',
       method: 'POST',
-      onSuccess: function onSuccess(response) {
-        var _response$data, _response$data2;
+      onSuccess(response) {
         console.log('backandEnable response', response);
-        var accessToken = response === null || response === void 0 || (_response$data = response.data) === null || _response$data === void 0 ? void 0 : _response$data.access_token;
-        var refreshToken = response === null || response === void 0 || (_response$data2 = response.data) === null || _response$data2 === void 0 ? void 0 : _response$data2.refresh_token;
-        if (accessToken && refreshToken) {
-          window[className].setAuthTokens(accessToken, refreshToken);
-          window[className].connectContactsWs();
-          window[className].connectActiveCallsWs();
-        }
+        window[className].applyBackendSession(response?.data || {});
       },
-      onFailure: function onFailure(response) {
+      onFailure(response) {
         console.log('backandEnable failure', response);
+        window[className].startPollingActiveCalls();
       },
-      onError: function onError(errorMessage, element, xhr) {
+      onError(errorMessage, element, xhr) {
         console.log('backandEnable error', errorMessage, xhr);
+        window[className].startPollingActiveCalls();
       }
     });
   },
-  setAuthTokens: function setAuthTokens(accessToken, refreshToken) {
+  applyBackendSession(data) {
+    const transport = String(data?.transport || 'polling');
+    this._backendTransport = transport;
+    this._backendRoutes = data?.routes && typeof data.routes === 'object' ? data.routes : {};
+    const accessToken = data?.access_token;
+    if (transport === 'polling' || !accessToken) {
+      this._authTokens = {};
+      this.startPollingActiveCalls();
+      return;
+    }
+    this.setAuthTokens(accessToken, data?.refresh_token || '', Number(data?.expires_in) || 3600);
+    this.connectContactsWs();
+    this.connectActiveCallsWs();
+  },
+  setAuthTokens(accessToken, refreshToken, expiresIn = 3600) {
     this._authTokens = this._authTokens || {};
     this._authTokens.access_token = accessToken;
     this._authTokens.refresh_token = refreshToken;
-    this._authTokens.exp = this.getJwtExp(accessToken);
+    this._authTokens.exp = this.getJwtExp(accessToken) || Math.floor(Date.now() / 1000) + Math.max(1, Number(expiresIn) || 3600);
   },
-  refreshAuthToken: function refreshAuthToken() {
-    var _this$_authTokens,
-      _this4 = this;
-    var refreshToken = (_this$_authTokens = this._authTokens) === null || _this$_authTokens === void 0 ? void 0 : _this$_authTokens.refresh_token;
-    if (!refreshToken) {
-      this.requestBackendEnable();
-      return;
-    }
-    $.ajax({
-      url: '/pbxcore/api/module-softphone-backend/v1/auth/refresh',
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + refreshToken
-      },
-      success: function success(response) {
-        var accessToken = response === null || response === void 0 ? void 0 : response.access_token;
-        var newRefreshToken = response === null || response === void 0 ? void 0 : response.refresh_token;
-        if (accessToken && newRefreshToken) {
-          _this4.setAuthTokens(accessToken, newRefreshToken);
-          _this4.scheduleContactsWsTokenRefresh();
-        } else {
-          _this4.requestBackendEnable();
-        }
-      },
-      error: function error() {
-        _this4.requestBackendEnable();
-      }
-    });
+  refreshAuthToken() {
+    this.requestBackendEnable();
   },
-  getJwtExp: function getJwtExp(token) {
+  getJwtExp(token) {
     try {
       if (!token || typeof token !== 'string') return 0;
-      var parts = token.split('.');
+      const parts = token.split('.');
       if (parts.length < 2) return 0;
-      var payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-      var padded = payloadB64 + '='.repeat((4 - payloadB64.length % 4) % 4);
-      var json = atob(padded);
-      var payload = JSON.parse(json);
-      return Number(payload === null || payload === void 0 ? void 0 : payload.exp) || 0;
+      const payloadB64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payloadB64 + '='.repeat((4 - payloadB64.length % 4) % 4);
+      const json = atob(padded);
+      const payload = JSON.parse(json);
+      return Number(payload?.exp) || 0;
     } catch (e) {
       return 0;
     }
   },
-  isAccessTokenExpired: function isAccessTokenExpired() {
-    var _this$_authTokens2;
-    var skewSeconds = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
-    var exp = Number((_this$_authTokens2 = this._authTokens) === null || _this$_authTokens2 === void 0 ? void 0 : _this$_authTokens2.exp) || 0;
+  isAccessTokenExpired(skewSeconds = 0) {
+    const exp = Number(this._authTokens?.exp) || 0;
     if (!exp) return false; // unknown exp -> don't force refresh
-    var now = Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000);
     return now + skewSeconds >= exp;
   },
-  scheduleContactsWsTokenRefresh: function scheduleContactsWsTokenRefresh() {
-    var _this$_authTokens3,
-      _this5 = this;
+  scheduleContactsWsTokenRefresh() {
     if (this._contactsWsTokenTimer) {
       clearTimeout(this._contactsWsTokenTimer);
       this._contactsWsTokenTimer = null;
     }
-    var exp = Number((_this$_authTokens3 = this._authTokens) === null || _this$_authTokens3 === void 0 ? void 0 : _this$_authTokens3.exp) || 0;
+    const exp = Number(this._authTokens?.exp) || 0;
     if (!exp) return;
-    var now = Math.floor(Date.now() / 1000);
-    var refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
-    this._contactsWsTokenTimer = setTimeout(function () {
-      _this5.refreshAuthToken();
+    const now = Math.floor(Date.now() / 1000);
+    const refreshInSec = Math.max(1, exp - now - 15); // 15s before exp
+    this._contactsWsTokenTimer = setTimeout(() => {
+      this.refreshAuthToken();
     }, refreshInSec * 1000);
   },
-  scheduleContactsWsReconnect: function scheduleContactsWsReconnect(reason) {
-    var _this6 = this;
-    var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+  scheduleContactsWsReconnect(reason, forceReAuth = false) {
+    if (this._backendTransport === 'polling' || !this._backendRoutes?.contacts) return;
     if (this._contactsWsReconnectTimer) {
       clearTimeout(this._contactsWsReconnectTimer);
       this._contactsWsReconnectTimer = null;
     }
     this._contactsWsReconnectAttempt = (this._contactsWsReconnectAttempt || 0) + 1;
-    var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
-    this._contactsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this6.isAccessTokenExpired(5)) {
-        _this6.requestBackendEnable();
+    const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._contactsWsReconnectAttempt - 1)));
+    this._contactsWsReconnectTimer = setTimeout(() => {
+      if (forceReAuth || this.isAccessTokenExpired(5)) {
+        this.requestBackendEnable();
       } else {
-        _this6.connectContactsWs();
+        this.connectContactsWs();
       }
     }, delay);
     console.log('contacts ws reconnect scheduled', {
-      reason: reason,
+      reason,
       delayMs: delay
     });
   },
-  connectContactsWs: function connectContactsWs() {
-    var _this7 = this;
+  connectContactsWs() {
     try {
-      var _this$_authTokens4;
-      var accessToken = (_this$_authTokens4 = this._authTokens) === null || _this$_authTokens4 === void 0 ? void 0 : _this$_authTokens4.access_token;
-      if (!accessToken) return;
+      const accessToken = this._authTokens?.access_token;
+      const route = String(this._backendRoutes?.contacts || '').trim();
+      if (!accessToken || !route || this._backendTransport === 'polling') return;
 
       // Avoid reconnecting if already connected/connecting
       if (this._contactsWs && (this._contactsWs.readyState === WebSocket.OPEN || this._contactsWs.readyState === WebSocket.CONNECTING)) {
@@ -1121,70 +997,74 @@ var ModuleMonitorActiveCalls = {
       }
       // Reset backoff on explicit connect attempt
       this._contactsWsReconnectAttempt = 0;
-      var wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      var wsHost = window.location.host; // host:port of current page
-      var tokenParam = encodeURIComponent(accessToken);
-      var wsUrl = "".concat(wsProto, "://").concat(wsHost, "/pbxcore/api/module-softphone-backend/v1/sub/contacts?authorization=").concat(tokenParam);
+      const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsHost = window.location.host; // host:port of current page
+      const tokenParam = encodeURIComponent(accessToken);
+      const wsUrl = `${wsProto}://${wsHost}${route}?authorization=${tokenParam}`;
       this._contactsWs = new WebSocket(wsUrl);
-      this._contactsWs.onopen = function () {
+      this._contactsWs.onopen = () => {
         console.log('contacts ws connected');
-        _this7.scheduleContactsWsTokenRefresh();
+        this.scheduleContactsWsTokenRefresh();
       };
-      this._contactsWs.onmessage = function (event) {
-        _this7.handleContactsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+      this._contactsWs.onmessage = event => {
+        this.handleContactsWsMessage(event?.data);
       };
-      this._contactsWs.onerror = function (event) {
+      this._contactsWs.onerror = event => {
         console.log('contacts ws error', event);
       };
-      this._contactsWs.onclose = function (event) {
-        var code = event === null || event === void 0 ? void 0 : event.code;
-        var reason = event === null || event === void 0 ? void 0 : event.reason;
+      this._contactsWs.onclose = event => {
+        const code = event?.code;
+        const reason = event?.reason;
         console.log('contacts ws closed', {
-          code: code,
-          reason: reason
+          code,
+          reason
         });
-        if (_this7._contactsWsTokenTimer) {
-          clearTimeout(_this7._contactsWsTokenTimer);
-          _this7._contactsWsTokenTimer = null;
+        if (this._contactsWsTokenTimer) {
+          clearTimeout(this._contactsWsTokenTimer);
+          this._contactsWsTokenTimer = null;
         }
 
         // 1000 = normal close -> reconnect; auth closes vary by server implementation.
-        var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this7.isAccessTokenExpired(0);
-        _this7.scheduleContactsWsReconnect('close', forceReAuth);
+        const authCloseCodes = new Set([1008, 4001, 4401, 4403]);
+        const forceReAuth = authCloseCodes.has(code) || this.isAccessTokenExpired(0);
+        this.scheduleContactsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('contacts ws init error', e);
       this.scheduleContactsWsReconnect('init_error', this.isAccessTokenExpired(0));
     }
   },
-  scheduleActiveCallsWsReconnect: function scheduleActiveCallsWsReconnect(reason) {
-    var _this8 = this;
-    var forceReAuth = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+  scheduleActiveCallsWsReconnect(reason, forceReAuth = false) {
+    if (this._backendTransport === 'polling' || !this._backendRoutes?.active_calls) {
+      this.startPollingActiveCalls();
+      return;
+    }
     if (this._activeCallsWsReconnectTimer) {
       clearTimeout(this._activeCallsWsReconnectTimer);
       this._activeCallsWsReconnectTimer = null;
     }
     this._activeCallsWsReconnectAttempt = (this._activeCallsWsReconnectAttempt || 0) + 1;
-    var delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._activeCallsWsReconnectAttempt - 1)));
-    this._activeCallsWsReconnectTimer = setTimeout(function () {
-      if (forceReAuth || _this8.isAccessTokenExpired(5)) {
-        _this8.requestBackendEnable();
+    const delay = Math.min(30000, 1000 * Math.pow(2, Math.min(5, this._activeCallsWsReconnectAttempt - 1)));
+    this._activeCallsWsReconnectTimer = setTimeout(() => {
+      if (forceReAuth || this.isAccessTokenExpired(5)) {
+        this.requestBackendEnable();
       } else {
-        _this8.connectActiveCallsWs();
+        this.connectActiveCallsWs();
       }
     }, delay);
     console.log('active-calls ws reconnect scheduled', {
-      reason: reason,
+      reason,
       delayMs: delay
     });
   },
-  connectActiveCallsWs: function connectActiveCallsWs() {
-    var _this9 = this;
+  connectActiveCallsWs() {
     try {
-      var _this$_authTokens5;
-      var accessToken = (_this$_authTokens5 = this._authTokens) === null || _this$_authTokens5 === void 0 ? void 0 : _this$_authTokens5.access_token;
-      if (!accessToken) return;
+      const accessToken = this._authTokens?.access_token;
+      const route = String(this._backendRoutes?.active_calls || '').trim();
+      if (!accessToken || !route || this._backendTransport === 'polling') {
+        this.startPollingActiveCalls();
+        return;
+      }
 
       // Avoid reconnecting if already connected/connecting
       if (this._activeCallsWs && (this._activeCallsWs.readyState === WebSocket.OPEN || this._activeCallsWs.readyState === WebSocket.CONNECTING)) {
@@ -1192,87 +1072,77 @@ var ModuleMonitorActiveCalls = {
       }
       // Reset backoff on explicit connect attempt
       this._activeCallsWsReconnectAttempt = 0;
-
-      // Token exists -> use WS, disable polling fallback
-      this.stopPollingActiveCalls();
-      var wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-      var wsHost = window.location.host; // host:port of current page
-      var tokenParam = encodeURIComponent(accessToken);
-      var wsUrl = "".concat(wsProto, "://").concat(wsHost, "/pbxcore/api/module-softphone-backend/v1/sub/active-calls?authorization=").concat(tokenParam);
+      const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsHost = window.location.host; // host:port of current page
+      const tokenParam = encodeURIComponent(accessToken);
+      const wsUrl = `${wsProto}://${wsHost}${route}?authorization=${tokenParam}`;
       this._activeCallsWs = new WebSocket(wsUrl);
-      this._activeCallsWs.onopen = function () {
+      this._activeCallsWs.onopen = () => {
         console.log('active-calls ws connected');
+        this.stopPollingActiveCalls();
         // Reuse the same token refresh timer (it triggers requestBackendEnable)
-        _this9.scheduleContactsWsTokenRefresh();
+        this.scheduleContactsWsTokenRefresh();
       };
-      this._activeCallsWs.onmessage = function (event) {
-        _this9.handleActiveCallsWsMessage(event === null || event === void 0 ? void 0 : event.data);
+      this._activeCallsWs.onmessage = event => {
+        this.handleActiveCallsWsMessage(event?.data);
       };
-      this._activeCallsWs.onerror = function (event) {
+      this._activeCallsWs.onerror = event => {
         console.log('active-calls ws error', event);
+        this.startPollingActiveCalls();
+        this.scheduleActiveCallsWsReconnect('error', this.isAccessTokenExpired(0));
       };
-      this._activeCallsWs.onclose = function (event) {
-        var code = event === null || event === void 0 ? void 0 : event.code;
-        var reason = event === null || event === void 0 ? void 0 : event.reason;
+      this._activeCallsWs.onclose = event => {
+        const code = event?.code;
+        const reason = event?.reason;
         console.log('active-calls ws closed', {
-          code: code,
-          reason: reason
+          code,
+          reason
         });
+        this.startPollingActiveCalls();
 
         // Auth closes vary by server implementation.
-        var authCloseCodes = new Set([1008, 4001, 4401, 4403]);
-        var forceReAuth = authCloseCodes.has(code) || _this9.isAccessTokenExpired(0);
-        _this9.scheduleActiveCallsWsReconnect('close', forceReAuth);
+        const authCloseCodes = new Set([1008, 4001, 4401, 4403]);
+        const forceReAuth = authCloseCodes.has(code) || this.isAccessTokenExpired(0);
+        this.scheduleActiveCallsWsReconnect('close', forceReAuth);
       };
     } catch (e) {
       console.log('active-calls ws init error', e);
+      this.startPollingActiveCalls();
       this.scheduleActiveCallsWsReconnect('init_error', this.isAccessTokenExpired(0));
     }
   },
-  handleContactsWsMessage: function handleContactsWsMessage(data) {
+  handleContactsWsMessage(data) {
     try {
       if (!data) return;
-      var parsed = typeof data === 'string' ? JSON.parse(data) : data;
-      var items = Array.isArray(parsed) ? parsed : [parsed];
-      var _iterator3 = _createForOfIteratorHelper(items),
-        _step3;
-      try {
-        for (_iterator3.s(); !(_step3 = _iterator3.n()).done;) {
-          var item = _step3.value;
-          var digits = String((item === null || item === void 0 ? void 0 : item.number) || '').replace(/\D+/g, '');
-          var phone10 = digits.length <= 10 ? digits : digits.slice(-10);
-          var displayName = String((item === null || item === void 0 ? void 0 : item.client) || (item === null || item === void 0 ? void 0 : item.contact) || '').trim();
-          if (phone10 && displayName) {
-            this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
-            this._contactsCacheByPhone10[phone10] = displayName;
-            this.idbPutContact(phone10, displayName).catch(function (e) {
-              return console.log('contacts cache save error', e);
-            });
-          }
-          if (window[className].$widgetQueues) {
-            window[className].$widgetQueues.updateContactFromWs(item);
-          }
-          // Calls table is a separate Vue instance and reads client name via $widgetQueues.
-          // Vue can't track cross-instance dependency, so force re-render on contact update.
-          if (window[className].$callsWidget && typeof window[className].$callsWidget.$forceUpdate === 'function') {
-            window[className].$callsWidget.$forceUpdate();
-          }
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      const items = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of items) {
+        const digits = String(item?.number || '').replace(/\D+/g, '');
+        const phone10 = digits.length <= 10 ? digits : digits.slice(-10);
+        const displayName = String(item?.client || item?.contact || '').trim();
+        if (phone10 && displayName) {
+          this._contactsCacheByPhone10 = this._contactsCacheByPhone10 || {};
+          this._contactsCacheByPhone10[phone10] = displayName;
+          this.idbPutContact(phone10, displayName).catch(e => console.log('contacts cache save error', e));
         }
-      } catch (err) {
-        _iterator3.e(err);
-      } finally {
-        _iterator3.f();
+        if (window[className].$widgetQueues) {
+          window[className].$widgetQueues.updateContactFromWs(item);
+        }
+        // Calls table is a separate Vue instance and reads client name via $widgetQueues.
+        // Vue can't track cross-instance dependency, so force re-render on contact update.
+        if (window[className].$callsWidget && typeof window[className].$callsWidget.$forceUpdate === 'function') {
+          window[className].$callsWidget.$forceUpdate();
+        }
       }
     } catch (e) {
       console.log('contacts ws parse error', e);
     }
   },
-  handleActiveCallsWsMessage: function handleActiveCallsWsMessage(data) {
+  handleActiveCallsWsMessage(data) {
     try {
-      var _parsed$data;
       if (!data) return;
-      var parsed = typeof data === 'string' ? JSON.parse(data) : data;
-      var payload = parsed !== null && parsed !== void 0 && parsed.queues ? parsed : parsed !== null && parsed !== void 0 && (_parsed$data = parsed.data) !== null && _parsed$data !== void 0 && _parsed$data.queues ? parsed.data : null;
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      const payload = parsed?.queues ? parsed : parsed?.data?.queues ? parsed.data : null;
       if (!payload) return;
       if (!window[className].$widgetQueues || !window[className].$callsWidget) return;
       window[className].$widgetQueues.updatedCallsFromResponse(payload);
@@ -1281,27 +1151,27 @@ var ModuleMonitorActiveCalls = {
       console.log('active-calls ws parse error', e);
     }
   },
-  formatElapsedTime: function formatElapsedTime(enterTime) {
+  formatElapsedTime(enterTime) {
     if (!enterTime) return '—';
-    var now = Math.floor(Date.now() / 1000);
-    var diffSeconds = now - enterTime;
+    const now = Math.floor(Date.now() / 1000);
+    const diffSeconds = now - enterTime;
     return window[className].secondToTime(diffSeconds);
   },
-  secondToTime: function secondToTime(diffSeconds) {
+  secondToTime(diffSeconds) {
     if (diffSeconds < 0) return '0';
     // Форматируем: чч:мм:сс или мм:сс, или просто секунды
-    var hours = Math.floor(diffSeconds / 3600);
-    var minutes = Math.floor(diffSeconds % 3600 / 60);
-    var seconds = Math.round(diffSeconds % 60);
+    const hours = Math.floor(diffSeconds / 3600);
+    const minutes = Math.floor(diffSeconds % 3600 / 60);
+    const seconds = Math.round(diffSeconds % 60);
     if (hours > 0) {
-      return "".concat(hours, ":").concat(minutes.toString().padStart(2, '0'), ":").concat(seconds.toString().padStart(2, '0'));
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     } else if (minutes > 0) {
-      return "".concat(minutes, ":").concat(seconds.toString().padStart(2, '0'));
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
     } else {
-      return "".concat(seconds);
+      return `${seconds}`;
     }
   },
-  onChangeSetting: function onChangeSetting(settingName, value) {
+  onChangeSetting(settingName, value) {
     if (window[className].isInit) {
       return;
     }
@@ -1312,10 +1182,10 @@ var ModuleMonitorActiveCalls = {
       on: 'now',
       method: 'POST',
       data: data,
-      successTest: function successTest(response) {
+      successTest: function (response) {
         return response !== undefined && Object.keys(response).length > 0 && response.success === true;
       },
-      onSuccess: function onSuccess(response) {
+      onSuccess: function (response) {
         if (settingName === 'queueIds') {
           // Update hidden input and Vue data
           $('#queueIds').val(value);
@@ -1327,50 +1197,50 @@ var ModuleMonitorActiveCalls = {
           window.location.href = window.location.href;
         }
       },
-      onFailure: function onFailure(response) {
+      onFailure: function (response) {
         console.log(response);
       },
-      onError: function onError(errorMessage, element, xhr) {
+      onError: function (errorMessage, element, xhr) {
         console.log(errorMessage, xhr);
       }
     });
   },
-  executeCallAction: function executeCallAction(data) {
+  executeCallAction(data) {
     $.api({
       url: window[className].executeCallUrl,
       on: 'now',
       method: 'POST',
       data: data,
-      successTest: function successTest(response) {
+      successTest(response) {
         return response !== undefined && Object.keys(response).length > 0 && response.success === true;
       },
-      onSuccess: function onSuccess(response) {
+      onSuccess(response) {
         console.log(response);
       },
-      onFailure: function onFailure(response) {
+      onFailure(response) {
         console.log(response);
       },
-      onError: function onError(errorMessage, element, xhr) {
+      onError(errorMessage, element, xhr) {
         console.log(errorMessage, xhr);
       }
     });
   },
-  updateLines: function updateLines() {
+  updateLines() {
     $.api({
       url: window[className].activeChannelsUrlV2,
       on: 'now',
       method: 'POST',
-      successTest: function successTest(response) {
+      successTest(response) {
         return response !== undefined && Object.keys(response).length > 0 && response.success === true;
       },
-      onSuccess: function onSuccess(response) {
+      onSuccess(response) {
         window[className].$widgetQueues.updatedCallsFromResponse(response);
         window[className].$callsWidget.updatedCallsFromResponse(response);
       },
-      onFailure: function onFailure(response) {
+      onFailure(response) {
         console.log(response);
       },
-      onError: function onError(errorMessage, element, xhr) {
+      onError(errorMessage, element, xhr) {
         console.log(errorMessage, xhr);
       }
     });
@@ -1380,28 +1250,29 @@ var ModuleMonitorActiveCalls = {
    * @param settings
    * @returns {*}
    */
-  cbBeforeSendForm: function cbBeforeSendForm(settings) {
-    var result = settings;
+  cbBeforeSendForm(settings) {
+    const result = settings;
     result.data = window[className].$formObj.form('get values');
     return result;
   },
   /**
    * Some actions after forms send
    */
-  cbAfterSendForm: function cbAfterSendForm() {},
+  cbAfterSendForm() {},
   /**
    * Initialize form parameters
    */
-  initializeForm: function initializeForm() {
+  initializeForm() {
     Form.$formObj = window[className].$formObj;
-    Form.url = "".concat(globalRootUrl).concat(idUrl, "/save");
+    Form.url = `${globalRootUrl}${idUrl}/save`;
     Form.validateRules = window[className].validateRules;
     Form.cbBeforeSendForm = window[className].cbBeforeSendForm;
     Form.cbAfterSendForm = window[className].cbAfterSendForm;
     Form.initialize();
   }
 };
-$(document).ready(function () {
+$(document).ready(() => {
   window[className].initialize();
 });
+
 //# sourceMappingURL=module-monitor-active-calls-index.js.map
