@@ -31,5 +31,14 @@ namespace {
         exit(1);
     }
 
+    $session = $mainClass::createBackendUiSession(42);
+    if (($session['success'] ?? false) !== true
+        || ($session['data']['transport'] ?? '') !== 'polling'
+        || ($session['data']['routes'] ?? null) !== []
+    ) {
+        fwrite(STDERR, "FAIL: incompatible SoftphoneBackend must select polling.\n");
+        exit(1);
+    }
+
     fwrite(STDOUT, "PASS: incompatible SoftphoneBackend is unavailable.\n");
 }

@@ -94,6 +94,50 @@ class MonitorActiveCallsMain extends PbxExtensionBase
         return $backendApiClass === null ? [] : $backendApiClass::createServiceToken($serviceId);
     }
 
+    /**
+     * Select the safest browser transport supported by the installed backend.
+     */
+    public static function createBackendUiSession(int $userId): array
+    {
+        $polling = [
+            'success' => true,
+            'data' => [
+                'transport' => 'polling',
+                'routes' => [],
+            ],
+        ];
+
+        if (!self::isBackendEnabled()) {
+            return $polling;
+        }
+
+        try {
+            if (class_exists(ClientActionFactory::class)
+                && method_exists(ClientActionFactory::class, 'createModuleUiSession')) {
+                $result = ClientActionFactory::createModuleUiSession('ModuleMonitorActiveCalls', $userId);
+                return is_array($result) ? $result : $polling;
+            }
+
+            if (class_exists(LegacyApiController::class)
+                && method_exists(LegacyApiController::class, 'createServiceToken')) {
+                $result = LegacyApiController::createServiceToken('ModuleMonitorActiveCalls');
+                if (!is_array($result) || !is_array($result['data'] ?? null)) {
+                    return $polling;
+                }
+                $result['data']['transport'] = 'legacy-v1';
+                $result['data']['routes'] = [
+                    'contacts' => '/pbxcore/api/module-softphone-backend/v1/sub/contacts',
+                    'active_calls' => '/pbxcore/api/module-softphone-backend/v1/sub/active-calls',
+                ];
+                return $result;
+            }
+        } catch (\Throwable $e) {
+            return $polling;
+        }
+
+        return $polling;
+    }
+
     public static function publishActiveCalls(array $data): void
     {
         $backendApiClass = self::getBackendApiClass();
@@ -112,8 +156,7 @@ class MonitorActiveCallsMain extends PbxExtensionBase
 
     private static function getBackendApiClass(): ?string
     {
-        $module = PbxExtensionModules::findFirstByUniqid('ModuleSoftphoneBackend');
-        if ($module === null || intval($module->disabled) !== 0) {
+        if (!self::isBackendEnabled()) {
             return null;
         }
 
@@ -132,5 +175,11 @@ class MonitorActiveCallsMain extends PbxExtensionBase
             }
         }
         return null;
+    }
+
+    private static function isBackendEnabled(): bool
+    {
+        $module = PbxExtensionModules::findFirstByUniqid('ModuleSoftphoneBackend');
+        return $module !== null && intval($module->disabled) === 0;
     }
 }

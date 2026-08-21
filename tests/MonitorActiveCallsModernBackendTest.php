@@ -23,6 +23,15 @@ namespace Modules\ModuleSoftphoneBackend\Lib\ClientAPI {
     {
         public static array $activeCalls = [];
         public static array $userStates = [];
+        public static string $serviceId = '';
+        public static int $userId = 0;
+
+        public static function createModuleUiSession(string $serviceId, int $userId): array
+        {
+            self::$serviceId = $serviceId;
+            self::$userId = $userId;
+            return ['success' => true, 'data' => ['transport' => 'scoped-v2']];
+        }
 
         public static function createServiceToken(string $serviceId): array
         {
@@ -60,6 +69,7 @@ namespace {
         MonitorActiveCallsMain::publishActiveCalls($activeCalls);
         MonitorActiveCallsMain::publishUserStates($userStates);
         $token = MonitorActiveCallsMain::createBackendServiceToken('ModuleMonitorActiveCalls');
+        $session = MonitorActiveCallsMain::createBackendUiSession(42);
     } catch (\Throwable $e) {
         fwrite(STDERR, 'FAIL: modern SoftphoneBackend API is not usable: ' . $e->getMessage() . "\n");
         exit(1);
@@ -68,6 +78,9 @@ namespace {
     if (ClientActionFactory::$activeCalls !== $activeCalls
         || ClientActionFactory::$userStates !== $userStates
         || ($token['service'] ?? '') !== 'ModuleMonitorActiveCalls'
+        || ($session['data']['transport'] ?? '') !== 'scoped-v2'
+        || ClientActionFactory::$serviceId !== 'ModuleMonitorActiveCalls'
+        || ClientActionFactory::$userId !== 42
     ) {
         fwrite(STDERR, "FAIL: data was not delegated to the modern SoftphoneBackend API.\n");
         exit(1);

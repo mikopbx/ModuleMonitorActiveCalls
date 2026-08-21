@@ -150,14 +150,10 @@ class ModuleMonitorActiveCallsController extends BaseController
 
     public function backandEnableAction() :void
     {
-        if (MonitorActiveCallsMain::backendExists()) {
-            $result = MonitorActiveCallsMain::createBackendServiceToken('ModuleMonitorActiveCalls');
-            $this->view->data = $result;
-            $this->view->success = !empty($result['success']);
-        }else{
-            $this->view->success = false;
-            $this->view->data = [];
-        }
+        [, , $userId] = $this->getUserData();
+        $result = MonitorActiveCallsMain::createBackendUiSession((int)$userId);
+        $this->view->data = $result['data'] ?? [];
+        $this->view->success = (bool)($result['success'] ?? false);
     }
 
     public function saveUserAction():void
