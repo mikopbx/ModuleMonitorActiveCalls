@@ -838,7 +838,6 @@ const ModuleMonitorActiveCalls = {
 			on: 'now',
 			method: 'POST',
 			onSuccess(response) {
-				console.log('backandEnable response', response);
 				window[className].applyBackendSession(response?.data || {});
 			},
 			onFailure(response) {

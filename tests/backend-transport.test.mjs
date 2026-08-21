@@ -4,6 +4,11 @@ import vm from 'node:vm';
 
 const sourcePath = new URL('../public/assets/js/src/module-monitor-active-calls-index.js', import.meta.url);
 const source = fs.readFileSync(sourcePath, 'utf8') + '\nglobalThis.__monitor = ModuleMonitorActiveCalls;\n';
+assert.equal(
+  source.includes("console.log('backandEnable response', response)"),
+  false,
+  'backend session response (including its token) must not be logged',
+);
 const fakeSockets = [];
 const scheduledTimeouts = [];
 
