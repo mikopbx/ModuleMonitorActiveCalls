@@ -741,12 +741,17 @@ class AsteriskManager
      */
     public function disconnect(): void
     {
-        if ($this->_loggedIn === true) {
+        if ($this->_loggedIn === true
+            && is_resource($this->socket)
+            && !feof($this->socket)
+        ) {
             $this->logoff();
         }
         if (is_resource($this->socket)) {
             fclose($this->socket);
         }
+        $this->socket = false;
+        $this->_loggedIn = false;
     }
 
     /**

@@ -40,9 +40,6 @@ class WorkerAmiActions extends WorkerBase
 
     public int $countReq = 0;
     public float $counterStartTime = 0;
-    protected CustomAsteriskManager $amCustom;
-
-
     /**
      * Handles the received signal.
      *
@@ -76,16 +73,22 @@ class WorkerAmiActions extends WorkerBase
     }
 
     /**
-     * Проверяет соединение с AMI, переподключает только при необходимости.
+     * Executes one command in a short-lived AMI session.
+     *
+     * @param callable $operation
+     * @return mixed
      */
-    private function ensureAmiConnected(): void
+    private function executeWithAmi(callable $operation)
     {
-        if ($this->amCustom->loggedIn()) {
-            return;
+        $manager = $this->getAstManager();
+        try {
+            if (!$manager->loggedIn()) {
+                throw new \RuntimeException('AMI is unavailable');
+            }
+            return $operation($manager);
+        } finally {
+            $manager->disconnect();
         }
-        $this->logger->writeInfo('AMI reconnecting...');
-        $this->amCustom->disconnect();
-        $this->amCustom = $this->getAstManager();
     }
 
     /**
@@ -97,10 +100,6 @@ class WorkerAmiActions extends WorkerBase
     {
         $this->logger = new Logger('AmiActions', 'ModuleMonitorActiveCalls');
         $this->logger->writeInfo('Starting...');
-        $this->amCustom = $this->getAstManager();
-        if (!$this->amCustom->loggedIn()) {
-            $this->logger->writeError('AMI not available at start, will reconnect on first request');
-        }
         $beanstalk      = new BeanstalkClient(self::class);
         $beanstalk->subscribe(self::class, [$this, 'onEvents']);
         $beanstalk->subscribe($this->makePingTubeName(self::class), [$this, 'pingCallBack']);
@@ -113,7 +112,6 @@ class WorkerAmiActions extends WorkerBase
                 $beanstalk->reconnect();
             }
         }
-        $this->amCustom->disconnect();
     }
 
     /**
@@ -163,7 +161,6 @@ class WorkerAmiActions extends WorkerBase
         $res->processor = __METHOD__;
 
         try {
-            $this->ensureAmiConnected();
             $action = strtolower($request['action'] ?? '');
             $data   = $request['data'] ?? [];
             $ch1    = $data['ch1'] ?? '';
@@ -181,31 +178,41 @@ class WorkerAmiActions extends WorkerBase
                 $actionChannel = $ch2;
             }
 
-            if ('join' === $action) {
-                $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
-                $channel  = "Local/{$number}@internal-originate";
-                $amiResult = $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $number, $variable);
-                $res->success = ($amiResult['Response'] ?? '') === 'Success';
-                SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qBS'");
-            } elseif ('whisper' === $action) {
-                $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
-                $channel  = "Local/{$number}@internal-originate";
-                $amiResult = $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $number, $variable);
-                $res->success = ($amiResult['Response'] ?? '') === 'Success';
-                SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qw'");
-            } elseif ('listen' === $action) {
-                $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
-                $channel  = "Local/{$number}@internal-originate";
-                $amiResult = $this->amCustom->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $number, $variable);
-                $res->success = ($amiResult['Response'] ?? '') === 'Success';
-                SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qoS'");
-            } elseif ('hangup' === $action) {
-                $this->amCustom->Hangup($ch1);
-                $res->success = true;
-            } else {
-                $res->success    = false;
-                $res->messages[] = 'API action not found in moduleRestAPICallback ModuleMonitorActiveCalls ' . $action;
-            }
+            $this->executeWithAmi(
+                static function (CustomAsteriskManager $manager) use (
+                    $action,
+                    $actionChannel,
+                    $ch1,
+                    $number,
+                    $res
+                ): void {
+                    if ('join' === $action) {
+                        $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
+                        $channel  = "Local/{$number}@internal-originate";
+                        $amiResult = $manager->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qBS', null, $number, $variable);
+                        $res->success = ($amiResult['Response'] ?? '') === 'Success';
+                        SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qBS'");
+                    } elseif ('whisper' === $action) {
+                        $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
+                        $channel  = "Local/{$number}@internal-originate";
+                        $amiResult = $manager->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qwS', null, $number, $variable);
+                        $res->success = ($amiResult['Response'] ?? '') === 'Success';
+                        SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qw'");
+                    } elseif ('listen' === $action) {
+                        $variable = "pt1c_cid=SPY-{$number},ALLOW_MULTY_ANSWER=1";
+                        $channel  = "Local/{$number}@internal-originate";
+                        $amiResult = $manager->Originate($channel, null, null, null, 'ChanSpy', $actionChannel.',qS', null, $number, $variable);
+                        $res->success = ($amiResult['Response'] ?? '') === 'Success';
+                        SystemMessages::sysLogMsg('SPY-ACTIVE-CHAN', "$action: {$number} to $actionChannel. mode 'qoS'");
+                    } elseif ('hangup' === $action) {
+                        $amiResult = $manager->Hangup($ch1);
+                        $res->success = ($amiResult['Response'] ?? '') === 'Success';
+                    } else {
+                        $res->success    = false;
+                        $res->messages[] = 'API action not found in moduleRestAPICallback ModuleMonitorActiveCalls ' . $action;
+                    }
+                }
+            );
         } catch (\Throwable $e) {
             $res->success = false;
             $res->messages[] = 'restAPICallback error: ' . $e->getMessage();
@@ -216,8 +223,9 @@ class WorkerAmiActions extends WorkerBase
 
     public function getChannels()
     {
-        $this->ensureAmiConnected();
-        return $this->amCustom->getChannels();
+        return $this->executeWithAmi(
+            static fn (CustomAsteriskManager $manager) => $manager->getChannels()
+        );
     }
 
     /**
