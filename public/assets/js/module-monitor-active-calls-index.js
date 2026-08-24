@@ -1281,6 +1281,7 @@ const ModuleMonitorActiveCalls = {
     Form.initialize();
   }
 };
+window[className] = ModuleMonitorActiveCalls;
 $(document).ready(() => {
   window[className].initialize();
 });

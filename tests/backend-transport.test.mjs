@@ -46,43 +46,61 @@ jqueryStub.ajax = () => {
   throw new Error('direct backend refresh must not be used');
 };
 
-const context = vm.createContext({
-  $: jqueryStub,
-  globalRootUrl: '/',
-  globalTranslate: {},
-  Form: {},
-  Config: {},
-  Extensions: {},
-  Vue: function Vue() {},
-  document: {},
-  window: {
-    location: { protocol: 'https:', host: 'pbx.example.test' },
-  },
-  WebSocket: FakeWebSocket,
-  console: { log() {}, error() {} },
-  setTimeout(callback, delay) {
-    scheduledTimeouts.push({ callback, delay });
-    return scheduledTimeouts.length;
-  },
-  clearTimeout() {},
-  setInterval() { return 1; },
-  clearInterval() {},
-  atob() { throw new Error('not a JWT'); },
-  Date,
-  Math,
-  JSON,
-  Object,
-  Array,
-  String,
-  Number,
-  Set,
-  Promise,
-  encodeURIComponent,
-});
+function createBrowserContext() {
+  return vm.createContext({
+    $: jqueryStub,
+    globalRootUrl: '/',
+    globalTranslate: {},
+    Form: {},
+    Config: {},
+    Extensions: {},
+    Vue: function Vue() {},
+    document: {},
+    window: {
+      location: { protocol: 'https:', host: 'pbx.example.test' },
+    },
+    WebSocket: FakeWebSocket,
+    console: { log() {}, error() {} },
+    setTimeout(callback, delay) {
+      scheduledTimeouts.push({ callback, delay });
+      return scheduledTimeouts.length;
+    },
+    clearTimeout() {},
+    setInterval() { return 1; },
+    clearInterval() {},
+    atob() { throw new Error('not a JWT'); },
+    Date,
+    Math,
+    JSON,
+    Object,
+    Array,
+    String,
+    Number,
+    Set,
+    Promise,
+    encodeURIComponent,
+  });
+}
+
+const context = createBrowserContext();
 
 vm.runInContext(source, context, { filename: sourcePath.pathname });
 const monitor = context.__monitor;
-context.window.ModuleMonitorActiveCalls = monitor;
+assert.equal(
+  context.window.ModuleMonitorActiveCalls,
+  monitor,
+  'the classic browser script must register its controller on window before document ready',
+);
+
+const builtPath = new URL('../public/assets/js/module-monitor-active-calls-index.js', import.meta.url);
+const builtSource = fs.readFileSync(builtPath, 'utf8') + '\nglobalThis.__monitor = ModuleMonitorActiveCalls;\n';
+const builtContext = createBrowserContext();
+vm.runInContext(builtSource, builtContext, { filename: builtPath.pathname });
+assert.equal(
+  builtContext.window.ModuleMonitorActiveCalls,
+  builtContext.__monitor,
+  'the deployed browser asset must register its controller on window before document ready',
+);
 
 assert.equal(
   JSON.stringify(monitor.normalizeActiveCallsPayload(undefined)),
