@@ -84,6 +84,26 @@ vm.runInContext(source, context, { filename: sourcePath.pathname });
 const monitor = context.__monitor;
 context.window.ModuleMonitorActiveCalls = monitor;
 
+assert.equal(
+  JSON.stringify(monitor.normalizeActiveCallsPayload(undefined)),
+  '{"calls":[],"queues":{}}',
+  'missing active-calls payload must render as empty collections',
+);
+assert.equal(
+  JSON.stringify(monitor.normalizeActiveCallsPayload({ calls: null, queues: 'invalid' })),
+  '{"calls":[],"queues":{}}',
+  'malformed active-calls payload must render as empty collections',
+);
+const validActiveCallsPayload = {
+  calls: [{ id: 'call-1' }],
+  queues: { 'queue-1': { id: 'queue-1' } },
+};
+assert.equal(
+  JSON.stringify(monitor.normalizeActiveCallsPayload(validActiveCallsPayload)),
+  JSON.stringify(validActiveCallsPayload),
+  'valid active-calls payload must be preserved',
+);
+
 let startPollingCalls = 0;
 let stopPollingCalls = 0;
 monitor.startPollingActiveCalls = () => { startPollingCalls += 1; };

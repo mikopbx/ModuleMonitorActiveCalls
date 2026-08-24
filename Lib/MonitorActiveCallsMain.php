@@ -95,6 +95,18 @@ class MonitorActiveCallsMain extends PbxExtensionBase
     }
 
     /**
+     * Keep the browser response stable while the worker cache is unavailable
+     * or contains data written by an older module version.
+     */
+    public static function normalizeActiveCallsPayload(?array $data): array
+    {
+        return [
+            'calls' => is_array($data['calls'] ?? null) ? $data['calls'] : [],
+            'queues' => is_array($data['queues'] ?? null) ? $data['queues'] : [],
+        ];
+    }
+
+    /**
      * Select the safest browser transport supported by the installed backend.
      */
     public static function createBackendUiSession(int $userId): array

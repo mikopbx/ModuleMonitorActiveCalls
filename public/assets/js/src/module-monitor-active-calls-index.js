@@ -27,6 +27,16 @@ const ModuleMonitorActiveCalls = {
 	_backendTransport: 'polling',
 	_backendRoutes: {},
 	_authTokens: {},
+	normalizeActiveCallsPayload(data) {
+		const payload = data && typeof data === 'object' ? data : {};
+		const queues = payload.queues && typeof payload.queues === 'object' && !Array.isArray(payload.queues)
+			? payload.queues
+			: {};
+		return {
+			calls: Array.isArray(payload.calls) ? payload.calls : [],
+			queues: queues,
+		};
+	},
 
 	/**
 	 * Field validation rules
@@ -57,12 +67,13 @@ const ModuleMonitorActiveCalls = {
 			delimiters: ["<%","%>"],
 			methods: {
 				updatedCallsFromResponse(data) {
+					const payload = window[className].normalizeActiveCallsPayload(data);
 					// Keep last payload to allow re-render on queue switch (WS mode).
-					this.lastActiveCallsPayload = data;
+					this.lastActiveCallsPayload = payload;
 
 					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
-					this.queues = data.queues || {};
-					this.allCalls = data.calls || [];
+					this.queues = payload.queues;
+					this.allCalls = payload.calls;
 
 					// Initialize multi-select dropdown if not yet done
 					this.initQueuesFilter();
@@ -587,17 +598,19 @@ const ModuleMonitorActiveCalls = {
 					return window[className].formatElapsedTime(call.answer);
 				},
 				updatedCallsFromResponse(data) {
+					const payload = window[className].normalizeActiveCallsPayload(data);
 					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
+					const calls = payload.calls.slice();
 					// Проходим по всем очередям
-					for (const queueId in data.queues) {
-						const queue = data.queues[queueId];
+					for (const queueId in payload.queues) {
+						const queue = payload.queues[queueId];
 						// Проверяем, есть ли у очереди поле calls и является ли оно массивом
-						if (Array.isArray(queue.calls)) {
+						if (queue && Array.isArray(queue.calls)) {
 							// Добавляем все вызовы из этой очереди в общий массив
-							data.calls.push(...queue.calls);
+							calls.push(...queue.calls);
 						}
 					}
-					this.calls = data.calls;
+					this.calls = calls;
 					this.$nextTick(() => {
 						Extensions.updatePhonesRepresent('need-update');
 					});

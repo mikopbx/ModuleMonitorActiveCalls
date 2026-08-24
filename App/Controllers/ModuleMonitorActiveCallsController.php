@@ -128,13 +128,14 @@ class ModuleMonitorActiveCallsController extends BaseController
     public function getActiveChannelsV2Action(): void
     {
         [$data] = CacheManager::getCacheData('getActiveChannelsV2Action');
-        if(is_array($data)){
+        $payload = MonitorActiveCallsMain::normalizeActiveCallsPayload(
+            is_array($data) ? $data : null
+        );
+        if (is_array($data)) {
             $this->view->isCacheData = true;
-            $this->view->calls  = $data['calls'];
-            $this->view->queues = $data['queues'];
-            return;
         }
-        $this->view->queues = [];
+        $this->view->calls = $payload['calls'];
+        $this->view->queues = $payload['queues'];
     }
 
     /**
