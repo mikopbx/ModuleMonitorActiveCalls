@@ -2,32 +2,8 @@
 
 declare(strict_types=1);
 
-namespace MikoPBX\Core\System {
-    final class Processes
-    {
-        public static function mwExec(string $command): int
-        {
-            return 1;
-        }
-    }
-
-    final class SystemMessages
-    {
-        public static function sysLogMsg(string $tag, string $message, int $level): void
-        {
-        }
-    }
-
-    final class Util
-    {
-        public static function which(string $command): string
-        {
-            return '/bin/false';
-        }
-    }
-}
-
 namespace {
+    require_once dirname(__DIR__, 3) . '/mikopbx/Core/vendor/autoload.php';
     require_once dirname(__DIR__) . '/Lib/AsteriskManager.php';
 
     $sockets = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, 0);
@@ -48,13 +24,13 @@ namespace {
     $manager = new \Modules\ModuleMonitorActiveCalls\Lib\AsteriskManager();
     $manager->socket = $workerSocket;
 
-    $loggedIn = new ReflectionProperty($manager, '_loggedIn');
+    $loggedIn = new ReflectionProperty(\MikoPBX\Core\Asterisk\AsteriskManager::class, '_loggedIn');
     $loggedIn->setAccessible(true);
     $loggedIn->setValue($manager, true);
 
     $manager->disconnect();
 
-    if ($manager->socket !== false) {
+    if ($manager->socket !== null) {
         fwrite(STDERR, 'FAIL: disconnect must clear the socket property.' . PHP_EOL);
         exit(1);
     }

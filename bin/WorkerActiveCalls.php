@@ -114,7 +114,6 @@ class WorkerActiveCalls extends WorkerBase
     private const CACHE_TTL = 80000;
     private const CONTROL_INTERVAL = 60;
     private const MAX_BRIDGE_ITERATIONS = 200;
-    private const AMI_REQUEST_TIMEOUT = 200000;
     private const STATE_UPDATE_DELAY = 200; // ms - задержка debounce для WebSocket обновлений
     private const NCHAN_REPUBLISH_INTERVAL = 30; // секунды - интервал повторной публикации в nchan для новых подписчиков
 
@@ -175,7 +174,7 @@ class WorkerActiveCalls extends WorkerBase
         $this->logger->writeInfo('Start channelAdditionalControl...');
         try{
             $channelsData = $this->amCustom->GetChannels();
-            if ($channelsData === null) {
+            if ($channelsData === null || !$this->amCustom->isConnected()) {
                 // AMI communication error — skip cleanup to avoid false positives
                 return;
             }
@@ -1077,7 +1076,7 @@ class WorkerActiveCalls extends WorkerBase
     public function getPjSipPeers(): array
     {
         $peers  = [];
-        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints', [], self::AMI_REQUEST_TIMEOUT);
+        $result = $this->amCustom->sendRequestTimeout('PJSIPShowEndpoints');
         $state_array = [
             'Not in use' => self::STATE_IDLE,
             'Busy'       => self::STATE_UP,
@@ -1170,7 +1169,7 @@ class WorkerActiveCalls extends WorkerBase
     {
         $amiPort  = PbxSettings::getValueByKey('AMIPort');
         $this->amCustom = new CustomAsteriskManager();
-        // Оригинальный AsteriskManager работает плохо с BridgeList и BridgeInfo
+        // Selected AMI adapter includes BridgeList and BridgeInfo support.
         $connected = $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
         if (!$connected) {
             $this->logger->writeError("Failed to connect to AMI on port $amiPort");
