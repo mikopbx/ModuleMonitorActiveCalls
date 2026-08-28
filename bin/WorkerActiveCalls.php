@@ -284,7 +284,9 @@ class WorkerActiveCalls extends WorkerBase
         self::updateStateFile('starting');
 
         $this->backendExists = MonitorActiveCallsMain::backendExists();
-        $this->initManagerAsterisk();
+        if (!$this->waitForAmiInitialization()) {
+            return;
+        }
         $this->getExtensionsInfo();
         $this->updateStates();
 
@@ -305,9 +307,10 @@ class WorkerActiveCalls extends WorkerBase
             try {
                 $this->amCustom->waitUserEvent(true);
                 if (!$this->amCustom->loggedIn()) {
-                    sleep(1);
                     $this->logger->writeInfo('initManagerAsterisk...');
-                    $this->initManagerAsterisk();
+                    if (!$this->waitForAmiInitialization()) {
+                        break;
+                    }
                     $this->amCustom->setOnIdleCallback(function () {
                         self::updateStateFile('running');
                         $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
@@ -316,10 +319,46 @@ class WorkerActiveCalls extends WorkerBase
                 }
             } catch (\Throwable $e) {
                 $this->logger->writeError("Error in main loop: " . $e->getMessage());
-                sleep(2);
-                $this->initManagerAsterisk();
+                if (!$this->waitForAmiInitialization()) {
+                    break;
+                }
             }
         }
+    }
+
+    /**
+     * Do not let the worker enter its main loop with a socket that was
+     * reconnected before AMI filters and event handlers were registered.
+     */
+    protected function waitForAmiInitialization(): bool
+    {
+        while (!$this->needRestart) {
+            try {
+                if ($this->initManagerAsterisk()) {
+                    return true;
+                }
+            } catch (\Throwable $e) {
+                $this->logger->writeError('AMI initialization failed: ' . $e->getMessage());
+                if (isset($this->amCustom)) {
+                    try {
+                        $this->amCustom->disconnect();
+                    } catch (\Throwable $ignored) {
+                        // The next attempt always creates a fresh manager.
+                    }
+                }
+            }
+            if ($this->needRestart) {
+                break;
+            }
+            self::updateStateFile('starting');
+            $this->pauseBeforeAmiRetry();
+        }
+        return false;
+    }
+
+    protected function pauseBeforeAmiRetry(): void
+    {
+        sleep(1);
     }
 
     /**
@@ -1165,7 +1204,7 @@ class WorkerActiveCalls extends WorkerBase
      * Установка фильтра
      *
      */
-    private function initManagerAsterisk():void
+    protected function initManagerAsterisk(): bool
     {
         $amiPort  = PbxSettings::getValueByKey('AMIPort');
         $this->amCustom = new CustomAsteriskManager();
@@ -1173,7 +1212,7 @@ class WorkerActiveCalls extends WorkerBase
         $connected = $this->amCustom->connect("127.0.0.1:$amiPort", MonitorActiveCallsConf::AMI_USER, MonitorActiveCallsConf::AMI_USER);
         if (!$connected) {
             $this->logger->writeError("Failed to connect to AMI on port $amiPort");
-            return;
+            return false;
         }
         // Устанавливаем короткий timeout для быстрой отработки idle callback и отправки WebSocket updates
         // 300ms оптимально согласуется с STATE_UPDATE_DELAY (200ms)
@@ -1199,6 +1238,7 @@ class WorkerActiveCalls extends WorkerBase
         foreach (self::QUEUE_EVENTS as $event){
             $this->amCustom->addEventHandler($event, [$this, "queueEvents"]);
         }
+        return true;
     }
 
     /**

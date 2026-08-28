@@ -21,6 +21,10 @@ class FakeWebSocket {
     this.readyState = FakeWebSocket.CONNECTING;
     fakeSockets.push(this);
   }
+
+  close() {
+    this.readyState = 3;
+  }
 }
 
 function jqueryStub() {
@@ -127,16 +131,19 @@ let stopPollingCalls = 0;
 monitor.startPollingActiveCalls = () => { startPollingCalls += 1; };
 monitor.stopPollingActiveCalls = () => { stopPollingCalls += 1; };
 
-function resetTransport() {
+function resetTransport(controller = monitor) {
   fakeSockets.length = 0;
   scheduledTimeouts.length = 0;
   startPollingCalls = 0;
   stopPollingCalls = 0;
-  monitor._contactsWs = null;
-  monitor._activeCallsWs = null;
-  monitor._contactsWsReconnectTimer = null;
-  monitor._activeCallsWsReconnectTimer = null;
-  monitor._contactsWsTokenTimer = null;
+  controller._contactsWs = null;
+  controller._activeCallsWs = null;
+  controller._contactsWsReconnectTimer = null;
+  controller._activeCallsWsReconnectTimer = null;
+  controller._contactsWsTokenTimer = null;
+  controller._activeCallsWsLastMessageAt = 0;
+  controller.$widgetQueues = { updatedCallsFromResponse() {} };
+  controller.$callsWidget = { updatedCallsFromResponse() {} };
 }
 
 resetTransport();
@@ -154,9 +161,57 @@ assert.equal(fakeSockets[1].url.includes('/sub/me/active-calls?authorization='),
 assert.equal(stopPollingCalls, 0, 'polling stopped before WebSocket open');
 fakeSockets[1].readyState = FakeWebSocket.OPEN;
 fakeSockets[1].onopen();
-assert.equal(stopPollingCalls, 1, 'polling did not stop after WebSocket open');
+assert.equal(stopPollingCalls, 0, 'polling stopped before the first valid WebSocket payload');
+monitor.checkActiveCallsWsLiveness();
+assert.equal(startPollingCalls, 1, 'zero-timestamp WebSocket did not keep polling active');
+fakeSockets[1].onmessage({ data: JSON.stringify(validActiveCallsPayload) });
+assert.equal(stopPollingCalls, 1, 'polling did not stop after the first valid WebSocket payload');
+assert.equal(monitor._activeCallsWsLastMessageAt > 0, true, 'valid WebSocket payload did not update liveness');
+
+const liveTimestamp = monitor._activeCallsWsLastMessageAt;
+monitor.applyBackendSession({
+  transport: 'scoped-v2',
+  access_token: 'refreshed-token',
+  routes: { active_calls: '/pbxcore/api/module-softphone-backend/v1/sub/me/active-calls' },
+});
+assert.equal(fakeSockets.length, 2, 'session refresh replaced an already-open active-calls socket');
+assert.equal(
+  monitor._activeCallsWsLastMessageAt,
+  liveTimestamp,
+  'session refresh reset liveness for a reused active-calls socket',
+);
+
+monitor._activeCallsWsLastMessageAt = Date.now() - 11000;
+monitor.checkActiveCallsWsLiveness();
+assert.equal(startPollingCalls, 2, 'polling did not resume after the WebSocket became silent');
+
+fakeSockets[1].onmessage({ data: JSON.stringify(validActiveCallsPayload) });
+assert.equal(stopPollingCalls, 2, 'polling did not stop after WebSocket delivery recovered');
 fakeSockets[1].onclose({ code: 1006, reason: 'test' });
-assert.equal(startPollingCalls, 1, 'polling did not resume after WebSocket close');
+assert.equal(startPollingCalls, 3, 'polling did not resume after WebSocket close');
+
+resetTransport();
+monitor.applyBackendSession({
+  transport: 'scoped-v2',
+  access_token: 'token',
+  routes: { active_calls: '/scoped/active-calls' },
+});
+const staleSocket = fakeSockets[0];
+const staleMessageHandler = staleSocket.onmessage;
+monitor.applyBackendSession({ transport: 'polling', routes: {} });
+const stopsBeforeStaleMessage = stopPollingCalls;
+staleMessageHandler({ data: JSON.stringify(validActiveCallsPayload) });
+assert.equal(stopPollingCalls, stopsBeforeStaleMessage, 'stale WebSocket payload stopped polling mode');
+
+resetTransport();
+monitor.applyBackendSession({
+  transport: 'scoped-v2',
+  access_token: 'token',
+  routes: { active_calls: '/scoped/active-calls' },
+});
+fakeSockets[0].onmessage({ data: JSON.stringify({ calls: [], queues: 'invalid' }) });
+assert.equal(stopPollingCalls, 0, 'malformed WebSocket payload stopped polling');
+assert.equal(monitor._activeCallsWsLastMessageAt, 0, 'malformed WebSocket payload updated liveness');
 
 resetTransport();
 monitor.applyBackendSession({
@@ -188,5 +243,20 @@ let backendEnableCalls = 0;
 monitor.requestBackendEnable = () => { backendEnableCalls += 1; };
 monitor.refreshAuthToken();
 assert.equal(backendEnableCalls, 1, 'token renewal did not request a new module UI session');
+
+const builtMonitor = builtContext.__monitor;
+resetTransport(builtMonitor);
+builtMonitor.startPollingActiveCalls = () => { startPollingCalls += 1; };
+builtMonitor.stopPollingActiveCalls = () => { stopPollingCalls += 1; };
+builtMonitor.applyBackendSession({
+  transport: 'scoped-v2',
+  access_token: 'token',
+  routes: { active_calls: '/scoped/active-calls' },
+});
+fakeSockets[0].readyState = FakeWebSocket.OPEN;
+fakeSockets[0].onopen();
+assert.equal(stopPollingCalls, 0, 'built asset stopped polling before a valid WebSocket payload');
+fakeSockets[0].onmessage({ data: JSON.stringify(validActiveCallsPayload) });
+assert.equal(stopPollingCalls, 1, 'built asset did not stop polling after a valid WebSocket payload');
 
 console.log('backend-transport.test.mjs: OK');

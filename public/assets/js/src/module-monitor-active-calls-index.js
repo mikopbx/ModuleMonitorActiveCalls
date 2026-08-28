@@ -27,6 +27,9 @@ const ModuleMonitorActiveCalls = {
 	_backendTransport: 'polling',
 	_backendRoutes: {},
 	_authTokens: {},
+	_activeCallsWsLastMessageAt: 0,
+	_activeCallsWsWatchdogTimer: null,
+	activeCallsWsSilenceTimeoutMs: 10000,
 	normalizeActiveCallsPayload(data) {
 		const payload = data && typeof data === 'object' ? data : {};
 		const queues = payload.queues && typeof payload.queues === 'object' && !Array.isArray(payload.queues)
@@ -733,6 +736,7 @@ const ModuleMonitorActiveCalls = {
 		window[className].initializeForm();
 		$('.menu .item').tab();
 		window[className].startUiTicker();
+		window[className].startActiveCallsWsWatchdog();
 		//////
 		// Удаляем отступы контейнера.
 		$('#main-content-container').removeClass('container');
@@ -769,6 +773,27 @@ const ModuleMonitorActiveCalls = {
 		if (!this._activeCallsPollTimer) return;
 		clearInterval(this._activeCallsPollTimer);
 		this._activeCallsPollTimer = null;
+	},
+	startActiveCallsWsWatchdog() {
+		if (this._activeCallsWsWatchdogTimer) return;
+		this._activeCallsWsWatchdogTimer = setInterval(() => {
+			this.checkActiveCallsWsLiveness();
+		}, 2000);
+	},
+	checkActiveCallsWsLiveness() {
+		if (this._backendTransport === 'polling') return;
+		if (!this._activeCallsWs || this._activeCallsWs.readyState !== WebSocket.OPEN) {
+			this.startPollingActiveCalls();
+			return;
+		}
+		if (!this._activeCallsWsLastMessageAt) {
+			// Keep the initial polling fallback until the first valid WS payload.
+			this.startPollingActiveCalls();
+			return;
+		}
+		if (Date.now() - this._activeCallsWsLastMessageAt > this.activeCallsWsSilenceTimeoutMs) {
+			this.startPollingActiveCalls();
+		}
 	},
 	async initContactsCache() {
 		try {
@@ -870,6 +895,7 @@ const ModuleMonitorActiveCalls = {
 		const accessToken = data?.access_token;
 		if (transport === 'polling' || !accessToken) {
 			this._authTokens = {};
+			this.invalidateActiveCallsWs();
 			this.startPollingActiveCalls();
 			return;
 		}
@@ -883,6 +909,21 @@ const ModuleMonitorActiveCalls = {
 		this._authTokens.refresh_token = refreshToken;
 		this._authTokens.exp = this.getJwtExp(accessToken)
 			|| Math.floor(Date.now() / 1000) + Math.max(1, Number(expiresIn) || 3600);
+	},
+	invalidateActiveCallsWs() {
+		const socket = this._activeCallsWs;
+		this._activeCallsWs = null;
+		this._activeCallsWsLastMessageAt = 0;
+		if (!socket) return;
+		socket.onopen = null;
+		socket.onmessage = null;
+		socket.onerror = null;
+		socket.onclose = null;
+		try {
+			socket.close();
+		} catch (e) {
+			// The socket is already unusable; polling remains the fallback.
+		}
 	},
 	refreshAuthToken() {
 		this.requestBackendEnable();
@@ -1027,25 +1068,31 @@ const ModuleMonitorActiveCalls = {
 			const tokenParam = encodeURIComponent(accessToken);
 			const wsUrl = `${wsProto}://${wsHost}${route}?authorization=${tokenParam}`;
 
-			this._activeCallsWs = new WebSocket(wsUrl);
-			this._activeCallsWs.onopen = () => {
+			const socket = new WebSocket(wsUrl);
+			this._activeCallsWs = socket;
+			this._activeCallsWsLastMessageAt = 0;
+			socket.onopen = () => {
 				console.log('active-calls ws connected');
-				this.stopPollingActiveCalls();
 				// Reuse the same token refresh timer (it triggers requestBackendEnable)
 				this.scheduleContactsWsTokenRefresh();
 			};
-			this._activeCallsWs.onmessage = (event) => {
+			socket.onmessage = (event) => {
+				if (this._activeCallsWs !== socket || this._backendTransport === 'polling') return;
 				this.handleActiveCallsWsMessage(event?.data);
 			};
-			this._activeCallsWs.onerror = (event) => {
+			socket.onerror = (event) => {
+				if (this._activeCallsWs !== socket) return;
 				console.log('active-calls ws error', event);
 				this.startPollingActiveCalls();
 				this.scheduleActiveCallsWsReconnect('error', this.isAccessTokenExpired(0));
 			};
-			this._activeCallsWs.onclose = (event) => {
+			socket.onclose = (event) => {
+				if (this._activeCallsWs !== socket) return;
 				const code = event?.code;
 				const reason = event?.reason;
 				console.log('active-calls ws closed', { code, reason });
+				this._activeCallsWs = null;
+				this._activeCallsWsLastMessageAt = 0;
 				this.startPollingActiveCalls();
 
 				// Auth closes vary by server implementation.
@@ -1091,11 +1138,17 @@ const ModuleMonitorActiveCalls = {
 			if (!data) return;
 			const parsed = typeof data === 'string' ? JSON.parse(data) : data;
 			const payload = parsed?.queues ? parsed : (parsed?.data?.queues ? parsed.data : null);
-			if (!payload) return;
+			if (!payload
+				|| !Array.isArray(payload.calls)
+				|| !payload.queues
+				|| typeof payload.queues !== 'object'
+				|| Array.isArray(payload.queues)) return;
 			if (!window[className].$widgetQueues || !window[className].$callsWidget) return;
 
 			window[className].$widgetQueues.updatedCallsFromResponse(payload);
 			window[className].$callsWidget.updatedCallsFromResponse(payload);
+			this._activeCallsWsLastMessageAt = Date.now();
+			this.stopPollingActiveCalls();
 		} catch (e) {
 			console.log('active-calls ws parse error', e);
 		}
