@@ -40,6 +40,43 @@ const ModuleMonitorActiveCalls = {
 			queues: queues,
 		};
 	},
+	isWaitingQueueCall(call) {
+		return Boolean(call && call.queueData && call.queueData.EnterTime !== undefined
+			&& call.queueData.EnterTime !== null);
+	},
+	collectDisplayCalls(data) {
+		const payload = this.normalizeActiveCallsPayload(data);
+		const calls = [];
+		const seenLinkedIds = new Set();
+		const append = function append(call) {
+			if (!call || typeof call !== 'object') return;
+			const linkedid = String(call.linkedid || '').trim();
+			if (linkedid !== '' && seenLinkedIds.has(linkedid)) return;
+			if (linkedid !== '') seenLinkedIds.add(linkedid);
+			calls.push(call);
+		};
+		payload.calls.forEach(append);
+		Object.keys(payload.queues).forEach(function appendQueueCalls(queueId) {
+			const queue = payload.queues[queueId];
+			if (queue && Array.isArray(queue.calls)) queue.calls.forEach(append);
+		});
+		return calls;
+	},
+	resolveQueueCalls(data, queueId) {
+		const payload = this.normalizeActiveCallsPayload(data);
+		const queue = payload.queues[queueId];
+		if (!queue) return [];
+		if (Array.isArray(queue.callIds)) {
+			const byLinkedId = {};
+			payload.calls.forEach(function indexCall(call) {
+				if (call && call.linkedid) byLinkedId[String(call.linkedid)] = call;
+			});
+			return queue.callIds.map(function resolveCall(linkedid) {
+				return byLinkedId[String(linkedid)];
+			}).filter(Boolean);
+		}
+		return Array.isArray(queue.calls) ? queue.calls : [];
+	},
 
 	/**
 	 * Field validation rules
@@ -156,30 +193,34 @@ const ModuleMonitorActiveCalls = {
 						this.updatedCallsFromResponse(this.lastActiveCallsPayload);
 					}
 				},
-				getQueueCalls(queueId) {
-					var queue = this.queues[queueId];
-					if (!queue) return [];
-					return Array.isArray(queue.calls) ? queue.calls : [];
+					getQueueCalls(queueId) {
+						return window[className].resolveQueueCalls({
+							calls: this.allCalls,
+							queues: this.queues
+						}, queueId);
 				},
 				getQueueAgentsList(queueId) {
 					var queue = this.queues[queueId];
 					if (!queue || !queue.agents) return [];
 					return this.buildAgentsList(queue.agents);
 				},
-				hasWaitingCalls(queueId) {
+					hasWaitingCalls(queueId) {
 					var calls = this.getQueueCalls(queueId);
 					var self = this;
 					for (var i = 0; i < calls.length; i++) {
 						var call = calls[i];
-						if (call.dst_chan === '' && call.queueData && call.queueData.EnterTime !== undefined) {
+						if (window[className].isWaitingQueueCall(call)) {
 							var elapsed = self.formatElapsedTime(call.queueData.EnterTime);
 							if (self.minWaitVisible <= elapsed) {
 								return true;
 							}
 						}
 					}
-					return false;
-				},
+						return false;
+					},
+					isWaitingQueueCall(call) {
+						return window[className].isWaitingQueueCall(call);
+					},
 				buildAgentsList(agentsObj) {
 					const entries = Object.entries(agentsObj || {});
 					const available = [];
@@ -600,20 +641,10 @@ const ModuleMonitorActiveCalls = {
 					}
 					return window[className].formatElapsedTime(call.answer);
 				},
-				updatedCallsFromResponse(data) {
-					const payload = window[className].normalizeActiveCallsPayload(data);
-					this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
-					const calls = payload.calls.slice();
-					// Проходим по всем очередям
-					for (const queueId in payload.queues) {
-						const queue = payload.queues[queueId];
-						// Проверяем, есть ли у очереди поле calls и является ли оно массивом
-						if (queue && Array.isArray(queue.calls)) {
-							// Добавляем все вызовы из этой очереди в общий массив
-							calls.push(...queue.calls);
-						}
-					}
-					this.calls = calls;
+					updatedCallsFromResponse(data) {
+						const payload = window[className].normalizeActiveCallsPayload(data);
+						this.minWaitVisible = 1*$('#minWaitVisibleValue').val();
+						this.calls = window[className].collectDisplayCalls(payload);
 					this.$nextTick(() => {
 						Extensions.updatePhonesRepresent('need-update');
 					});

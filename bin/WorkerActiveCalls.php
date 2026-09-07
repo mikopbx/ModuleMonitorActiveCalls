@@ -26,7 +26,10 @@ use MikoPBX\Core\System\SystemMessages;
 use Modules\ModuleMonitorActiveCalls\Lib\AsteriskManager as CustomAsteriskManager;
 use MikoPBX\Core\Workers\WorkerBase;
 use MikoPBX\Core\System\Util;
+use Modules\ModuleMonitorActiveCalls\Lib\ActiveCallProjector;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
+use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateResolver;
+use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateSource;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
@@ -507,11 +510,7 @@ class WorkerActiveCalls extends WorkerBase
                     $call['spy_chan'] = $this->spyerChannels[$linkedid]['src_chan']??'';
                 }
             }
-            if(empty($call['lastQueue'])){
-                $calls[] = $call;
-            }else{
-                $queuesData[$call['lastQueue']]['calls'][] = $call;
-            }
+            ActiveCallProjector::append($calls, $queuesData, $call);
         }
 
         // Move Unavailable agents to the end of the list (keep original order for the rest).
@@ -1284,13 +1283,10 @@ class WorkerActiveCalls extends WorkerBase
             unset($this->activeChannels[$foundLinkedId][$channel]);
             unset($this->states[$endpoint]['channels'][$channel]);
 
-            // Сбросить состояние endpoint в Idle, если у него не осталось активных каналов.
-            // Без этого "Ring"/"Up" висит до следующего ExtensionStatus от Asterisk, а тот
-            // не приходит для коротких pickup-каналов (*8XXX), не меняющих device hint.
-            // isset защищает от автовивификации для не-PEER endpoint'ов (Local, провайдер),
-            // которые не регистрируются в states в Newchannel.
-            if (isset($this->states[$endpoint]) && empty($this->states[$endpoint]['channels'])) {
-                $this->states[$endpoint]['state'] = self::STATE_IDLE;
+            // Hangup only removes a channel. It does not prove that the endpoint is Idle:
+            // the device may be unregistered, have DND enabled, or have another active leg.
+            if (isset($this->states[$endpoint])) {
+                $this->refreshEndpointStateAfterHangup($endpoint);
             }
 
             // Если удалённый канал был src_chan, ищем альтернативный канал с тем же endpoint
@@ -1577,6 +1573,39 @@ class WorkerActiveCalls extends WorkerBase
 
         $this->logger->writeInfo($parameters,'callEvents...');
         $this->printActiveCalls();
+    }
+
+    /**
+     * Recalculate endpoint state from live Asterisk sources after removing a channel.
+     */
+    private function refreshEndpointStateAfterHangup(string $endpoint): void
+    {
+        $channelStates = [];
+        foreach (array_keys($this->states[$endpoint]['channels'] ?? []) as $channel) {
+            foreach ($this->activeChannels as $channels) {
+                if (isset($channels[$channel])) {
+                    $channelStates[] = (string)($channels[$channel]['ChannelStateDesc'] ?? '');
+                    break;
+                }
+            }
+        }
+
+        $fallback = (string)($this->states[$endpoint]['state'] ?? self::STATE_UNAVAILABLE);
+        $sources = (new EndpointStateSource($this->amCustom))->read($endpoint);
+        $state = EndpointStateResolver::resolve(
+            $channelStates,
+            $sources['registration'] ?? null,
+            $sources['hint'] ?? null,
+            $sources['custom'] ?? null,
+            $fallback
+        );
+        $this->states[$endpoint]['state'] = $state;
+        $this->logger->writeInfo(
+            "Endpoint state refreshed after Hangup: endpoint={$endpoint}, state={$state}, " .
+            "registration=" . ($sources['registration'] ?? 'unknown') . ", " .
+            "hint=" . ($sources['hint'] ?? 'unknown') . ", custom=" . ($sources['custom'] ?? 'unknown') .
+            ", remainingChannels=" . count($channelStates)
+        );
     }
 
     public static function getEndpointName(string $channel):string

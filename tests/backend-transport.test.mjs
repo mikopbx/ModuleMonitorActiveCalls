@@ -126,6 +126,48 @@ assert.equal(
   'valid active-calls payload must be preserved',
 );
 
+const queueCall = {
+  linkedid: 'queue-call-1',
+  dst_chan: 'PJSIP/provider-0001',
+  queueData: { QueueID: 'queue-1', EnterTime: 100 },
+};
+assert.equal(
+  monitor.isWaitingQueueCall(queueCall),
+  true,
+  'a live queue entry must not disappear when dst_chan contains a stale or transient leg',
+);
+assert.equal(
+  monitor.isWaitingQueueCall({ linkedid: 'ended-call', queueData: {} }),
+  false,
+  'a call without queue entry time must not be treated as waiting',
+);
+
+const mergedCalls = monitor.collectDisplayCalls({
+  calls: [queueCall, { linkedid: 'regular-call' }],
+  queues: {
+    'queue-1': {
+      calls: [queueCall, { linkedid: 'legacy-queue-call', queueData: { EnterTime: 101 } }],
+    },
+  },
+});
+assert.deepEqual(
+  Array.from(mergedCalls, (call) => call.linkedid),
+  ['queue-call-1', 'regular-call', 'legacy-queue-call'],
+  'the lower table must merge old and new payloads without duplicating queue calls',
+);
+
+const canonicalQueueCall = { linkedid: 'canonical-queue-call', queueData: { EnterTime: 102 } };
+const resolvedQueueCalls = monitor.resolveQueueCalls({
+  calls: [canonicalQueueCall],
+  queues: { 'queue-2': { callIds: ['canonical-queue-call'] } },
+}, 'queue-2');
+assert.equal(resolvedQueueCalls.length, 1, 'queue call IDs must resolve to the canonical call object');
+assert.equal(
+  resolvedQueueCalls[0],
+  canonicalQueueCall,
+  'queue projection must not create a duplicate call object',
+);
+
 let startPollingCalls = 0;
 let stopPollingCalls = 0;
 monitor.startPollingActiveCalls = () => { startPollingCalls += 1; };

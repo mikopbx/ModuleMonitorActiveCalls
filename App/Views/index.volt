@@ -93,7 +93,7 @@
                     </div>
                 </h4>
                 <div class="ui relaxed divided list">
-                    <div v-for="call in getQueueCalls(queueId)" v-if="call.dst_chan==='' && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
+                    <div v-for="call in getQueueCalls(queueId)" v-if="isWaitingQueueCall(call) && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
                         <div class="content">
                             <div class="header">
                                 <i v-if="hasClientByPhone(call.src_num)" class="address book outline icon" aria-hidden="true"></i>
