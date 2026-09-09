@@ -68,7 +68,6 @@ class WorkerActiveCalls extends WorkerBase
     // Periodic nchan re-publish (для новых подписчиков при отсутствии событий)
     private int $lastNchanPublishTime = 0;          // timestamp последней публикации в nchan (unix)
     private $lastPublishedCallData = null;          // последние опубликованные данные active calls
-    private $lastPublishedStatesData = null;        // последние опубликованные данные users states
 
     public const ENDPOINT_TYPE_PEER = '1';
     public const ENDPOINT_TYPE_PROVIDER = '2';
@@ -599,11 +598,8 @@ class WorkerActiveCalls extends WorkerBase
                 "time since last: {$timeSinceLastSent}ms");
 
             CacheManager::setCacheData('getUsersStates', $this->pendingUserStatesData, self::CACHE_TTL);
-            if ($this->backendExists) {
-                MonitorActiveCallsMain::publishUserStates($this->pendingUserStatesData);
-                $this->lastNchanPublishTime = time();
-            }
-            $this->lastPublishedStatesData = $this->pendingUserStatesData;
+            // Backend employee-state streams are owned exclusively by its Go engine.
+            // Keep the legacy module cache, but never overwrite Backend snapshots.
             $this->lastStateUpdateSent = $now;
             $this->pendingUserStatesData = null;
         }
@@ -627,9 +623,6 @@ class WorkerActiveCalls extends WorkerBase
 
         if ($this->lastPublishedCallData !== null) {
             MonitorActiveCallsMain::publishActiveCalls($this->lastPublishedCallData);
-        }
-        if ($this->lastPublishedStatesData !== null) {
-            MonitorActiveCallsMain::publishUserStates($this->lastPublishedStatesData);
         }
     }
 
