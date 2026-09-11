@@ -30,6 +30,7 @@ use Modules\ModuleMonitorActiveCalls\Lib\ActiveCallProjector;
 use Modules\ModuleMonitorActiveCalls\Lib\CacheManager;
 use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateResolver;
 use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateSource;
+use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateAmiSession;
 use Modules\ModuleMonitorActiveCalls\Lib\Logger;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsConf;
 use Modules\ModuleMonitorActiveCalls\Lib\MonitorActiveCallsMain;
@@ -48,6 +49,12 @@ class WorkerActiveCalls extends WorkerBase
     protected CustomAsteriskManager $amCustom;
     private array $activeChannels = [];
     private array $states = [];
+    private array $endpointStateVersions = [];
+    private array $endpointHints = [];
+    private array $pendingEndpointStates = [];
+    private bool $checkingEndpointStates = false;
+    private int $eventDispatchDepth = 0;
+    private float $nextEndpointCheck = 0.0;
     private array $mobileStates = [];
     private array $activeBridges = [];
     private array $callType = [];
@@ -184,6 +191,9 @@ class WorkerActiveCalls extends WorkerBase
             // Cleanup by linkedid and also prune stale channels inside existing linkedid.
             foreach (array_keys($this->activeChannels) as $linkedId) {
                 if (!isset($channelsData[$linkedId]) || !is_array($channelsData[$linkedId])) {
+                    foreach (array_keys($this->activeChannels[$linkedId]) as $channel) {
+                        $this->removeEndpointChannel($channel);
+                    }
                     unset(
                         $this->activeChannels[$linkedId],
                         $this->callType[$linkedId],
@@ -197,10 +207,7 @@ class WorkerActiveCalls extends WorkerBase
                 foreach (array_keys($this->activeChannels[$linkedId]) as $channel) {
                     if (!isset($actualChannels[$channel])) {
                         unset($this->activeChannels[$linkedId][$channel]);
-                        if(strpos($channel, '/') !== false) {
-                            $endpoint = self::getEndpointName($channel);
-                            unset($this->states[$endpoint]['channels'][$channel]);
-                        }
+                        $this->removeEndpointChannel($channel);
                     }
                 }
 
@@ -300,11 +307,6 @@ class WorkerActiveCalls extends WorkerBase
         $this->printActiveCalls();
         self::updateStateFile('running');
         $this->logger->writeInfo('Wait events...');
-        $this->amCustom->setOnIdleCallback(function () {
-            self::updateStateFile('running');
-            $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
-            $this->republishToNchan();        // Переиздаём данные для новых подписчиков
-        }, 1); // Проверка каждую секунду для быстрой отправки WS updates
         while ($this->needRestart === false) {
             try {
                 $this->amCustom->waitUserEvent(true);
@@ -313,11 +315,6 @@ class WorkerActiveCalls extends WorkerBase
                     if (!$this->waitForAmiInitialization()) {
                         break;
                     }
-                    $this->amCustom->setOnIdleCallback(function () {
-                        self::updateStateFile('running');
-                        $this->flushPendingStateUpdate(); // Отправляем накопленные WS обновления, если есть
-                        $this->republishToNchan();        // Переиздаём данные для новых подписчиков
-                    }, 1); // Проверка каждую секунду для быстрой отправки WS updates
                 }
             } catch (\Throwable $e) {
                 $this->logger->writeError("Error in main loop: " . $e->getMessage());
@@ -1222,14 +1219,15 @@ class WorkerActiveCalls extends WorkerBase
             $this->amCustom->sendRequestTimeout('Filter', $params);
         }
 
-        $this->amCustom->addEventHandler("UserEvent",       [$this, "stateEvents"]);
-        $this->amCustom->addEventHandler("ExtensionStatus", [$this, "stateEvents"]);
-        foreach (self::CALL_EVENTS as $event){
-            $this->amCustom->addEventHandler($event, [$this, "callEvents"]);
+        foreach (array_unique(array_merge(self::CALL_EVENTS, self::QUEUE_EVENTS)) as $event) {
+            $this->amCustom->addEventHandler($event, [$this, 'dispatchAmiEvent']);
         }
-        foreach (self::QUEUE_EVENTS as $event){
-            $this->amCustom->addEventHandler($event, [$this, "queueEvents"]);
-        }
+        $this->amCustom->setOnIdleCallback(function () {
+            self::updateStateFile('running');
+            $this->processPendingEndpointStates();
+            $this->flushPendingStateUpdate();
+            $this->republishToNchan();
+        }, 1);
         return true;
     }
 
@@ -1238,6 +1236,27 @@ class WorkerActiveCalls extends WorkerBase
      * @param $parameters
      * @return void
      */
+    public function dispatchAmiEvent(array $parameters): void
+    {
+        ++$this->eventDispatchDepth;
+        try {
+            $event = $parameters['Event'] ?? '';
+            if (in_array($event, ['UserEvent', 'ExtensionStatus'], true)) {
+                $this->stateEvents($parameters);
+            } elseif (in_array($event, self::QUEUE_EVENTS, true)) {
+                $this->queueEvents($parameters);
+            } else {
+                $this->callEvents($parameters);
+            }
+        } finally {
+            --$this->eventDispatchDepth;
+        }
+        // Also tick under continuous event traffic, after the outer handler returns.
+        if ($this->eventDispatchDepth === 0 && !$this->init) {
+            $this->processPendingEndpointStates();
+        }
+    }
+
     public function callEvents($parameters):void
     {
         $event = $parameters['Event'] ?? '';
@@ -1274,12 +1293,16 @@ class WorkerActiveCalls extends WorkerBase
                           ($this->callType[$foundLinkedId]['src_chan'] ?? '') === $channel;
 
             unset($this->activeChannels[$foundLinkedId][$channel]);
-            unset($this->states[$endpoint]['channels'][$channel]);
+            $this->removeEndpointChannel($channel);
 
             // Hangup only removes a channel. It does not prove that the endpoint is Idle:
             // the device may be unregistered, have DND enabled, or have another active leg.
             if (isset($this->states[$endpoint])) {
-                $this->refreshEndpointStateAfterHangup($endpoint);
+                $this->states[$endpoint]['state'] = EndpointStateResolver::resolve(
+                    $this->endpointChannelStates($endpoint), null,
+                    $this->endpointHints[$endpoint] ?? null, null,
+                    (string)($this->states[$endpoint]['state'] ?? self::STATE_UNAVAILABLE)
+                );
             }
 
             // Если удалённый канал был src_chan, ищем альтернативный канал с тем же endpoint
@@ -1343,6 +1366,8 @@ class WorkerActiveCalls extends WorkerBase
             ];
 
             if($chanData['Type'] === self::ENDPOINT_TYPE_PEER){
+                $this->endpointStateVersions[$endpoint] = ($this->endpointStateVersions[$endpoint] ?? 0) + 1;
+                unset($this->endpointHints[$endpoint]);
                 $this->states[$endpoint]['channels'][$channel] = true;
                 if($this->states[$endpoint]['state'] <> self::STATE_UP){
                     $this->states[$endpoint]['state'] = $chanData['ChannelStateDesc'];
@@ -1568,10 +1593,21 @@ class WorkerActiveCalls extends WorkerBase
         $this->printActiveCalls();
     }
 
-    /**
-     * Recalculate endpoint state from live Asterisk sources after removing a channel.
-     */
-    private function refreshEndpointStateAfterHangup(string $endpoint): void
+    private function removeEndpointChannel(string $channel): void
+    {
+        if (strpos($channel, '/') === false) {
+            return;
+        }
+        $endpoint = self::getEndpointName($channel);
+        if (!isset($this->states[$endpoint])) {
+            return;
+        }
+        unset($this->states[$endpoint]['channels'][$channel]);
+        $this->endpointStateVersions[$endpoint] = ($this->endpointStateVersions[$endpoint] ?? 0) + 1;
+        $this->scheduleEndpointStateCheck($endpoint);
+    }
+
+    private function endpointChannelStates(string $endpoint): array
     {
         $channelStates = [];
         foreach (array_keys($this->states[$endpoint]['channels'] ?? []) as $channel) {
@@ -1582,23 +1618,98 @@ class WorkerActiveCalls extends WorkerBase
                 }
             }
         }
+        return $channelStates;
+    }
 
-        $fallback = (string)($this->states[$endpoint]['state'] ?? self::STATE_UNAVAILABLE);
-        $sources = (new EndpointStateSource($this->amCustom))->read($endpoint);
-        $state = EndpointStateResolver::resolve(
-            $channelStates,
-            $sources['registration'] ?? null,
-            $sources['hint'] ?? null,
-            $sources['custom'] ?? null,
-            $fallback
-        );
-        $this->states[$endpoint]['state'] = $state;
-        $this->logger->writeInfo(
-            "Endpoint state refreshed after Hangup: endpoint={$endpoint}, state={$state}, " .
-            "registration=" . ($sources['registration'] ?? 'unknown') . ", " .
-            "hint=" . ($sources['hint'] ?? 'unknown') . ", custom=" . ($sources['custom'] ?? 'unknown') .
-            ", remainingChannels=" . count($channelStates)
-        );
+    private function scheduleEndpointStateCheck(string $endpoint): void
+    {
+        // A new lifecycle deserves a fresh check; repeated Hangups coalesce by endpoint.
+        $this->pendingEndpointStates[$endpoint] = ['due' => microtime(true), 'attempt' => 0];
+    }
+
+    protected function createEndpointStateManager(): object
+    {
+        $port = PbxSettings::getValueByKey('AMIPort');
+        return new EndpointStateAmiSession("127.0.0.1:$port", MonitorActiveCallsConf::AMI_USER,
+            MonitorActiveCallsConf::AMI_USER);
+    }
+
+    private function processPendingEndpointStates(): void
+    {
+        $now = microtime(true);
+        if ($this->checkingEndpointStates || $this->eventDispatchDepth > 0 || $now < $this->nextEndpointCheck) {
+            return;
+        }
+        foreach ($this->pendingEndpointStates as $endpoint => $pending) {
+            if ($pending['due'] > $now) {
+                continue;
+            }
+            $endpoint = (string)$endpoint;
+            if (!isset($this->states[$endpoint])) {
+                unset($this->pendingEndpointStates[$endpoint]);
+                continue;
+            }
+            $this->checkingEndpointStates = true;
+            $manager = null;
+            $version = $this->endpointStateVersions[$endpoint] ?? 0;
+            $oldState = (string)($this->states[$endpoint]['state'] ?? self::STATE_UNAVAILABLE);
+            $sources = ['registration' => null, 'hint' => null, 'custom' => null];
+            try {
+                $manager = $this->createEndpointStateManager();
+                $source = new EndpointStateSource($manager);
+                $sources = $source->read($endpoint);
+                $this->logger->writeInfo('Endpoint state queries: endpoint=' . $endpoint . ', ' . json_encode($source->diagnostics()));
+            } catch (\Throwable $exception) {
+                $this->logger->writeInfo("Endpoint state lookup failed: endpoint={$endpoint}, error=" . $exception->getMessage());
+            } finally {
+                // A timed-out response must never be consumed by the next check.
+                try {
+                    if ($manager !== null) {
+                        $manager->disconnect();
+                    }
+                } catch (\Throwable $exception) {
+                    $this->logger->writeInfo("Endpoint state disconnect failed: endpoint={$endpoint}");
+                }
+                $this->checkingEndpointStates = false;
+                $this->nextEndpointCheck = microtime(true) + 0.25;
+            }
+            $currentVersion = $this->endpointStateVersions[$endpoint] ?? 0;
+            $channelStates = $this->endpointChannelStates($endpoint);
+            $confirmed = $sources['hint'] !== null || $sources['registration'] === self::STATE_UNAVAILABLE
+                || ($sources['registration'] === self::STATE_IDLE && $sources['custom'] !== null);
+            $stale = $version !== $currentVersion;
+            if (!$stale && $confirmed) {
+                $this->states[$endpoint]['state'] = EndpointStateResolver::resolve(
+                    $channelStates, $sources['registration'], $sources['hint'], $sources['custom'], $oldState
+                );
+                if ($sources['hint'] !== null) {
+                    $this->endpointHints[$endpoint] = $sources['hint'];
+                }
+            }
+            $unresolvedActivity = $channelStates === [] && in_array($this->states[$endpoint]['state'],
+                [self::STATE_RING, self::STATE_RINGING, self::STATE_UP, self::STATE_ONHOLD, self::STATE_BUSY], true);
+            $settled = !$stale && $confirmed && !$unresolvedActivity;
+            if ($settled) {
+                unset($this->pendingEndpointStates[$endpoint]);
+            } else {
+                $attempt = $stale ? 0 : $pending['attempt'];
+                $delay = [1, 3, 10][$attempt] ?? 60;
+                unset($this->pendingEndpointStates[$endpoint]);
+                $this->pendingEndpointStates[$endpoint] = [
+                    'due' => microtime(true) + $delay, 'attempt' => min($attempt + 1, 3),
+                ];
+            }
+            $state = $this->states[$endpoint]['state'];
+            $this->logger->writeInfo("Endpoint state reconciled: endpoint={$endpoint}, old={$oldState}, state={$state}, " .
+                "version={$version}/{$currentVersion}, remainingChannels=" . count($channelStates) .
+                ", registration=" . ($sources['registration'] ?? 'unknown') .
+                ", hint=" . ($sources['hint'] ?? 'unknown') . ", custom=" . ($sources['custom'] ?? 'unknown') .
+                ", elapsedMs=" . (int)((microtime(true) - $now) * 1000) .
+                ", result=" . ($stale ? 'stale' : ($settled ? 'confirmed' : 'retry')));
+            $this->printActiveCalls();
+            // One endpoint per tick bounds work and lets the listener drain events.
+            break;
+        }
     }
 
     public static function getEndpointName(string $channel):string
@@ -1685,7 +1796,13 @@ class WorkerActiveCalls extends WorkerBase
         if($event === 'ExtensionStatus'){
             $exten = $parameters['Exten'] ?? '';
             if(!empty($exten) && isset($this->states[$exten]) && empty($this->states[$exten]['isQueue'])){
-                $this->states[$exten]['state'] = $parameters['StatusText'] ?? '';
+                $hint = $parameters['StatusText'] ?? '';
+                if (!is_string($hint) || trim($hint) === '') {
+                    return;
+                }
+                $this->endpointStateVersions[$exten] = ($this->endpointStateVersions[$exten] ?? 0) + 1;
+                $this->endpointHints[$exten] = $hint;
+                $this->states[$exten]['state'] = $hint;
                 $this->logger->writeInfo($parameters,'stateEvents...');
                 $this->printActiveCalls();
                 $this->updateCacheState();

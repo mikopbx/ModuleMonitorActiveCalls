@@ -10,6 +10,12 @@ final class EndpointStateAmiFake
 {
     public function sendRequestTimeout(string $action, array $parameters = []): array
     {
+        if ($action === 'ExtensionState') {
+            return ['Response' => 'Success', 'Status' => ($parameters['Exten'] === '132' ? '2' : '4')];
+        }
+        if ($action === 'GetVar') {
+            return ['Response' => 'Success', 'Value' => ($parameters['Variable'] === 'DEVICE_STATE(Custom:132)' ? 'BUSY' : 'NOT_INUSE')];
+        }
         if ($action !== 'PJSIPShowEndpoint') {
             return [];
         }
@@ -26,15 +32,7 @@ final class EndpointStateAmiFake
         return ['data' => ['ContactStatusDetail' => []]];
     }
 
-    public function ExtensionState(string $extension, string $context): array
-    {
-        return ['StatusText' => $extension === '132' ? 'Busy' : 'Unavailable'];
-    }
 
-    public function GetVar(string $channel, string $variable, $actionId = null, bool $retArray = true)
-    {
-        return $variable === 'DEVICE_STATE(Custom:132)' ? 'BUSY' : 'NOT_INUSE';
-    }
 }
 
 function endpointSourceAssertSame($expected, $actual, string $message): void
@@ -58,4 +56,17 @@ endpointSourceAssertSame('Unavailable', $state134['registration'], 'an endpoint 
 endpointSourceAssertSame('Unavailable', $state134['hint'], 'an unavailable hint must be returned');
 endpointSourceAssertSame('NOT_INUSE', $state134['custom'], 'a non-DND Custom state must be returned');
 
-fwrite(STDOUT, 'PASS: endpoint state sources are read from current Asterisk state.' . PHP_EOL);
+
+
+$missing = new class {
+    public int $requests = 0;
+    public function sendRequestTimeout(string $action, array $parameters): array {
+        ++$this->requests;
+        return [];
+    }
+};
+$missingSource = new EndpointStateSource($missing);
+endpointSourceAssertSame(['registration' => null, 'hint' => null, 'custom' => null], $missingSource->read('222'), 'timeout is not a registration state');
+endpointSourceAssertSame(1, $missing->requests, 'a failed response must stop queries on the desynchronized session');
+
+fwrite(STDOUT, 'PASS: endpoint sources use bounded queries, numeric hints and stop on timeout.' . PHP_EOL);

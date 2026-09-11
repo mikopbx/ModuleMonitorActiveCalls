@@ -6,17 +6,31 @@ namespace MikoPBX\Core\Workers {
     class WorkerBase
     {
         protected bool $needRestart = false;
+        protected function makePingTubeName(string $class): string { return 'test-ping'; }
     }
 }
 
+namespace MikoPBX\Common\Models {
+    class PbxSettings { public static function getValueByKey(string $key): string { return '5038'; } }
+}
+
 namespace Modules\ModuleMonitorActiveCalls\Lib {
+    class MonitorActiveCallsConf { public const AMI_USER = 'test'; }
     class AsteriskManager
     {
+        public array $handlers = [];
+        public $idle = null;
+        public function connect(...$arguments): bool { return true; }
+        public function setSocketTimeout(int $seconds, int $microseconds): void {}
+        public function sendRequestTimeout(string $action, array $parameters): array { return ['Response' => 'Success']; }
+        public function addEventHandler(string $event, callable $handler): void { $this->handlers[$event][] = $handler; }
+        public function setOnIdleCallback(callable $callback, int $interval): void { $this->idle = $callback; }
     }
 
     class Logger
     {
         public int $errors = 0;
+        public function writeInfo($message, string $header = ''): void {}
 
         public function writeError(mixed $message, string $header = ''): void
         {
@@ -112,6 +126,24 @@ namespace {
     if ($worker->attempts !== 1 || $worker->pauses !== 1) {
         fwrite(STDERR, 'FAIL: shutdown must prevent another AMI initialization attempt.' . PHP_EOL);
         exit(1);
+    }
+
+    // Exercise real registration, including reconnect: state events must route exactly once.
+    $worker = new AmiInitializationProbe([true]);
+    $class = \Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class;
+    foreach ([1, 2] as $connection) {
+        (new \ReflectionMethod($class, 'initManagerAsterisk'))->invoke($worker);
+        $manager = (new \ReflectionProperty($class, 'amCustom'))->getValue($worker);
+        if (count($manager->handlers['ExtensionStatus'] ?? []) !== 1 || !is_callable($manager->idle)) {
+            throw new \RuntimeException('Each AMI initialization must install one state dispatcher and restore the idle callback');
+        }
+        (new \ReflectionProperty($class, 'states'))->setValue($worker, ['222' => ['state' => 'Ringing']]);
+        ($manager->handlers['ExtensionStatus'][0])(['Event' => 'ExtensionStatus', 'Exten' => '222', 'StatusText' => 'Idle']);
+        $states = (new \ReflectionProperty($class, 'states'))->getValue($worker);
+        if ($states['222']['state'] !== 'Idle') {
+            throw new \RuntimeException('Registered ExtensionStatus handler must reach the employee state');
+        }
+        ($manager->idle)();
     }
 
     fwrite(STDOUT, 'PASS: WorkerActiveCalls waits for a fully initialized AMI session.' . PHP_EOL);

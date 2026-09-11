@@ -23,6 +23,9 @@ final class EndpointStateResolver
         if (in_array('Ringing', $normalizedChannels, true)) {
             return 'Ringing';
         }
+        if (in_array('OnHold', $normalizedChannels, true)) {
+            return 'OnHold';
+        }
         if (in_array('Busy', $normalizedChannels, true)) {
             return 'Busy';
         }
