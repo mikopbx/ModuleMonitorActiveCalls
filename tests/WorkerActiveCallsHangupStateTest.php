@@ -16,6 +16,10 @@ namespace Modules\ModuleMonitorActiveCalls\Lib {
         public int $reads = 0;
         public int $disconnections = 0;
         public ?string $hint = null;
+        public array $snapshotChannels = [];
+        public array $snapshotMembers = [];
+        public bool $snapshotComplete = true;
+        public bool $queueSnapshotComplete = true;
         public string $custom = 'NOT_INUSE';
         public bool $registered = false;
         public function GetChannels(): array { return []; }
@@ -25,6 +29,10 @@ namespace Modules\ModuleMonitorActiveCalls\Lib {
         public function sendRequestTimeout(string $action, array $parameters = []): array
         {
             ++$this->reads;
+            if (in_array($action, ['CoreShowChannels', 'QueueStatus'], true)) {
+                return ($this->snapshotComplete && ($action !== 'QueueStatus' || $this->queueSnapshotComplete)) ? ['Response' => 'Success', 'EventList' => 'Complete',
+                    'data' => ['CoreShowChannel' => $this->snapshotChannels, 'QueueMember' => $this->snapshotMembers]] : [];
+            }
             if ($this->duringRead !== null) {
                 $callback = $this->duringRead;
                 $this->duringRead = null;
@@ -264,6 +272,65 @@ namespace {
     $worker->reconcile();
     check($worker->endpointState('132') === 'Idle', 'channel cleanup must repair employee status');
     check(empty($worker->get('states')['132']['channels']), 'whole linkedid cleanup must remove endpoint channel references');
+
+    // Periodic control must repair activity even when no Hangup or active call remains.
+    $worker = new HangupStateProbe();
+    $worker->set('states', ['132' => ['name' => 'Test', 'state' => 'Ringing', 'channels' => []]]);
+    $worker->manager()->registered = true;
+    $worker->manager()->hint = 'Idle';
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    $worker->reconcile();
+    check($worker->endpointState('132') === 'Idle', 'periodic sweep must repair ringing without any recorded calls');
+
+    $worker = new HangupStateProbe();
+    $worker->set('mobileStates', ['7915' => ['name' => 'Mobile', 'state' => 'Busy', 'channels' => []]]);
+    $worker->manager()->snapshotMembers = [['Name' => '7915', 'Status' => '1']];
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    check($worker->get('mobileStates')['7915']['state'] === 'Idle', 'QueueStatus must repair a missed mobile status event');
+
+    $worker = new HangupStateProbe();
+    $worker->callEvents(['Event' => 'Newchannel'] + $baseEvent);
+    $worker->manager()->snapshotComplete = false;
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    check($worker->get('activeChannels') !== [], 'incomplete channel snapshot must not remove active calls');
+    check($worker->endpointState('132') === 'Ringing', 'failed snapshot must preserve endpoint state');
+
+    $worker = new HangupStateProbe();
+    $worker->callEvents(['Event' => 'Newchannel'] + $baseEvent);
+    $worker->manager()->snapshotChannels = [['Linkedid' => $baseEvent['Linkedid'], 'Channel' => $baseEvent['Channel']]];
+    $worker->manager()->registered = true;
+    $worker->manager()->hint = 'Idle';
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    $worker->reconcile();
+    check($worker->endpointState('132') === 'Ringing', 'a real ringing channel must override Idle from the hint');
+    check($worker->get('activeChannels') !== [], 'complete snapshot must preserve its existing channels');
+    $worker->publish();
+    $calls = \Modules\ModuleMonitorActiveCalls\Lib\CacheManager::$data['getActiveChannelsV2Action']['calls'];
+    check($calls[0]['src_name'] === 'Test', 'call snapshots must carry employee names for Vue rendering');
+
+    $worker = new HangupStateProbe();
+    $worker->set('mobileStates', ['7915' => ['name' => 'Mobile', 'state' => 'Busy', 'channels' => []]]);
+    $worker->manager()->queueSnapshotComplete = false;
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    check($worker->get('mobileStates')['7915']['state'] === 'Busy', 'failed QueueStatus must preserve mobile state');
+    $worker->manager()->queueSnapshotComplete = true;
+    $worker->manager()->snapshotMembers = [['Name' => '7915', 'Status' => '2'], ['Name' => '7915', 'Status' => '1']];
+    (new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'channelAdditionalControl'))->invoke($worker);
+    check($worker->get('mobileStates')['7915']['state'] === 'Busy', 'Idle in another queue must not hide mobile activity');
+
+    // The periodic tick must run without incoming events, and be rate limited.
+    $worker = new HangupStateProbe();
+    $worker->set('states', ['132' => ['name' => 'Test', 'state' => 'Ringing', 'channels' => []]]);
+    $worker->set('init', false);
+    $worker->manager()->registered = true;
+    $worker->manager()->hint = 'Idle';
+    $tick = new \ReflectionMethod(\Modules\ModuleMonitorActiveCalls\bin\WorkerActiveCalls::class, 'processPeriodicStateControl');
+    $tick->invoke($worker);
+    $reads = $worker->manager()->reads;
+    $tick->invoke($worker);
+    check($worker->manager()->reads === $reads, 'periodic sweep must not run again within 60 seconds');
+    $worker->reconcile();
+    check($worker->endpointState('132') === 'Idle', 'periodic tick must schedule orphan status recovery without AMI events');
 
     // Continuous unrelated events must drive due checks, not just the idle callback.
     $worker = new HangupStateProbe();

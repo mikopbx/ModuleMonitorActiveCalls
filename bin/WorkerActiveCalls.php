@@ -46,6 +46,7 @@ class WorkerActiveCalls extends WorkerBase
     private string $lastPrintHash = '';
     private string $lastPrintUserHash = '';
     private int $lastControlActiveCalls = 0;
+    private array $suspectStateSince = [];
     protected CustomAsteriskManager $amCustom;
     private array $activeChannels = [];
     private array $states = [];
@@ -177,16 +178,25 @@ class WorkerActiveCalls extends WorkerBase
      */
     private function channelAdditionalControl()
     {
-        if(empty($this->activeChannels)){
-            return;
-        }
+        $manager = null;
         $this->logger->writeInfo('Start channelAdditionalControl...');
-        try{
-            $channelsData = $this->amCustom->GetChannels();
-            if ($channelsData === null || !$this->amCustom->isConnected()) {
-                // AMI communication error — skip cleanup to avoid false positives
+        try {
+            // A separate, deadline-bound connection cannot re-enter event handlers.
+            $manager = $this->createEndpointStateManager();
+            $snapshot = $manager->sendRequestTimeout('CoreShowChannels');
+            if (($snapshot['Response'] ?? '') !== 'Success' || ($snapshot['EventList'] ?? '') !== 'Complete') {
+                $this->logger->writeInfo('Periodic state check: incomplete channel snapshot, preserving state');
                 return;
             }
+            $channelsData = [];
+            foreach ($snapshot['data']['CoreShowChannel'] ?? [] as $row) {
+                if (empty($row['Linkedid']) || empty($row['Channel'])) {
+                    $this->logger->writeInfo('Periodic state check: malformed channel snapshot, preserving state');
+                    return;
+                }
+                $channelsData[$row['Linkedid']][] = $row['Channel'];
+            }
+
 
             // Cleanup by linkedid and also prune stale channels inside existing linkedid.
             foreach (array_keys($this->activeChannels) as $linkedId) {
@@ -276,9 +286,62 @@ class WorkerActiveCalls extends WorkerBase
                     unset($this->channelLinkedIds[$channel]);
                 }
             }
-        }catch (\Throwable $e){
-            SystemMessages::sysLogMsg( static::class, "Channel control: " . $e->getMessage(), LOG_WARNING);
+            // Missing Hangup can leave a status behind even after all calls were removed.
+            foreach ($this->states as $endpoint => $state) {
+                $endpoint = (string)$endpoint;
+                if (!empty($state['isQueue'])) { continue; }
+                $active = in_array($state['state'] ?? '', [self::STATE_RING, self::STATE_RINGING,
+                    self::STATE_BUSY, self::STATE_UP, self::STATE_ONHOLD], true);
+                if ($active) {
+                    $this->suspectStateSince[$endpoint] = $this->suspectStateSince[$endpoint] ?? time();
+                    if (!isset($this->pendingEndpointStates[$endpoint])) {
+                        $this->scheduleEndpointStateCheck($endpoint);
+                    }
+                    $this->logger->writeInfo('Periodic endpoint check: endpoint=' . $endpoint .
+                        ', state=' . $state['state'] . ', observedActiveSeconds=' . (time() - $this->suspectStateSince[$endpoint]) .
+                        ', remainingChannels=' . count($this->endpointChannelStates($endpoint)));
+                } else {
+                    unset($this->suspectStateSince[$endpoint]);
+                }
+            }
+            if ($this->mobileStates !== []) {
+                $queues = $manager->sendRequestTimeout('QueueStatus');
+                if (($queues['Response'] ?? '') === 'Success' && ($queues['EventList'] ?? '') === 'Complete') {
+                    $memberStates = [];
+                    foreach ($queues['data']['QueueMember'] ?? [] as $member) {
+                        $number = (string)($member['Name'] ?? $member['MemberName'] ?? '');
+                        $state = self::QUEUE_AGENT_STATES[$member['Status'] ?? ''] ?? null;
+                        if ($state !== null && isset($this->mobileStates[$number])) {
+                            // A member can occur in several queues; any activity wins over Idle.
+                            if (!isset($memberStates[$number]) || $state !== self::STATE_IDLE) {
+                                $memberStates[$number] = $state;
+                            }
+                        }
+                    }
+                    foreach ($memberStates as $number => $state) {
+                        $old = $this->mobileStates[$number]['state'];
+                        $this->mobileStates[$number]['state'] = $state;
+                        $this->logger->writeInfo("Periodic mobile check: endpoint={$number}, old={$old}, state={$state}, source=QueueStatus");
+                    }
+                } else {
+                    $this->logger->writeInfo('Periodic mobile check: incomplete QueueStatus, preserving state');
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->logger->writeInfo('Periodic state check failed, retry on next sweep: ' . $e->getMessage());
+        } finally {
+            if ($manager !== null) { $manager->disconnect(); }
         }
+    }
+
+    private function processPeriodicStateControl(): void
+    {
+        if ($this->init || $this->eventDispatchDepth > 0 || time() - $this->lastControlActiveCalls < self::CONTROL_INTERVAL) {
+            return;
+        }
+        $this->lastControlActiveCalls = time();
+        $this->channelAdditionalControl();
+        $this->printActiveCalls();
     }
 
     /**
@@ -386,10 +449,6 @@ class WorkerActiveCalls extends WorkerBase
     {
         if($this->init){
             return;
-        }
-        if(time() - $this->lastControlActiveCalls > self::CONTROL_INTERVAL){
-            $this->lastControlActiveCalls = time();
-            $this->channelAdditionalControl();
         }
 
         $queuesData = $this->queuesData;
@@ -527,11 +586,30 @@ class WorkerActiveCalls extends WorkerBase
             $queuesData[$qId]['agents'] = $availableAgents + $unavailableAgents;
         }
 
+        // Keep labels in the same snapshot as channel identity; the browser renders text only.
+        foreach ($calls as &$displayCall) {
+            foreach (['src', 'dst'] as $side) {
+                $displayCall[$side . '_name'] = $this->numberName($displayCall[$side . '_num']);
+            }
+            $displayCall['exten_name'] = $this->numberName($displayCall['exten']);
+            foreach ($displayCall['calledChannels'] as &$leg) {
+                $leg['name'] = $this->numberName($leg['number']);
+            }
+            unset($leg);
+            foreach ($displayCall['bridgeChannels'] as &$bridge) {
+                $bridge['src_name'] = $this->numberName($bridge['src_num']);
+                $bridge['dst_name'] = $this->numberName($bridge['dst_num']);
+            }
+            unset($bridge);
+        }
+        unset($displayCall);
+
         $callData = ['queues' => $queuesData, 'calls' => $calls];
         $dataPrint = json_encode($callData, JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         $newPrintHash = md5($dataPrint);
         if($newPrintHash <> $this->lastPrintHash){
             $this->lastPrintHash = $newPrintHash;
+            $this->logger->writeInfo(['hash' => $newPrintHash, 'calls' => $calls], 'Active calls snapshot');
             CacheManager::setCacheData('getActiveChannelsV2Action', $callData, self::CACHE_TTL);
             if($this->backendExists) {
                 MonitorActiveCallsMain::publishActiveCalls($callData);
@@ -1158,6 +1236,7 @@ class WorkerActiveCalls extends WorkerBase
                     'channels' => []
                 ];
             }else{
+                if (isset($this->mobileStates[$extension->number])) { continue; }
                 $this->mobileStates[$extension->number] = [
                     'state' => self::STATE_IDLE,
                     'name' => $extension->callerid,
@@ -1224,6 +1303,7 @@ class WorkerActiveCalls extends WorkerBase
         }
         $this->amCustom->setOnIdleCallback(function () {
             self::updateStateFile('running');
+            $this->processPeriodicStateControl();
             $this->processPendingEndpointStates();
             $this->flushPendingStateUpdate();
             $this->republishToNchan();
@@ -1253,6 +1333,7 @@ class WorkerActiveCalls extends WorkerBase
         }
         // Also tick under continuous event traffic, after the outer handler returns.
         if ($this->eventDispatchDepth === 0 && !$this->init) {
+            $this->processPeriodicStateControl();
             $this->processPendingEndpointStates();
         }
     }
@@ -1591,6 +1672,11 @@ class WorkerActiveCalls extends WorkerBase
 
         $this->logger->writeInfo($parameters,'callEvents...');
         $this->printActiveCalls();
+    }
+
+    private function numberName(string $number): string
+    {
+        return (string)($this->states[$number]['name'] ?? $this->mobileStates[$number]['name'] ?? '');
     }
 
     private function removeEndpointChannel(string $channel): void

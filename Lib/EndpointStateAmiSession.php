@@ -42,7 +42,7 @@ final class EndpointStateAmiSession
     public function sendRequestTimeout(string $action, array $parameters = []): array
     {
         try {
-            if (!in_array($action, ['Login', 'PJSIPShowEndpoint', 'ExtensionState', 'GetVar'], true)) {
+            if (!in_array($action, ['Login', 'PJSIPShowEndpoint', 'ExtensionState', 'GetVar', 'CoreShowChannels', 'QueueStatus'], true)) {
                 throw new RuntimeException('Unsupported endpoint query');
             }
             $id = 'endpoint-' . bin2hex(random_bytes(8));
@@ -63,6 +63,8 @@ final class EndpointStateAmiSession
                 }
                 $request = substr($request, $written);
             }
+            $completion = ['PJSIPShowEndpoint' => 'EndpointDetailComplete',
+                'CoreShowChannels' => 'CoreShowChannelsComplete', 'QueueStatus' => 'QueueStatusComplete'][$action] ?? null;
             $response = null;
             while (true) {
                 $frame = $this->readFrame();
@@ -70,15 +72,18 @@ final class EndpointStateAmiSession
                     continue;
                 }
                 if (isset($frame['Response'])) {
-                    if ($frame['Response'] !== 'Success' || $action !== 'PJSIPShowEndpoint') {
+                    if ($frame['Response'] !== 'Success' || $completion === null) {
                         return $frame;
                     }
                     $response = $frame;
                     $response['data'] = [];
                 } elseif ($response !== null && isset($frame['Event'])) {
-                    if ($frame['Event'] === 'EndpointDetailComplete') {
+                    if ($frame['Event'] === $completion) {
                         // Only a complete snapshot can prove that no contacts exist.
-                        $response['data']['ContactStatusDetail'] = $response['data']['ContactStatusDetail'] ?? [];
+                        if ($action === 'PJSIPShowEndpoint') {
+                            $response['data']['ContactStatusDetail'] = $response['data']['ContactStatusDetail'] ?? [];
+                        }
+                        $response['EventList'] = 'Complete';
                         return $response;
                     }
                     $response['data'][$frame['Event']][] = $frame;

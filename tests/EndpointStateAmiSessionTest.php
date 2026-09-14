@@ -15,7 +15,7 @@ if (!class_exists(\Modules\ModuleMonitorActiveCalls\Lib\EndpointStateAmiSession:
 use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateAmiSession;
 use Modules\ModuleMonitorActiveCalls\Lib\EndpointStateSource;
 
-foreach (['numeric', 'text', 'ws', 'no-contacts', 'login-timeout', 'partial', 'wrong-id'] as $scenario) {
+foreach (['channels', 'queues', 'numeric', 'text', 'ws', 'no-contacts', 'login-timeout', 'partial', 'wrong-id'] as $scenario) {
     $server = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
     if ($server === false) { throw new RuntimeException($error); }
     $address = stream_socket_get_name($server, false);
@@ -35,6 +35,15 @@ foreach (['numeric', 'text', 'ws', 'no-contacts', 'login-timeout', 'partial', 'w
         }
         reply($client, ['Response' => 'Success', 'ActionID' => $login['ActionID']]);
         $endpoint = readFrame($client);
+        if (in_array($scenario, ['channels', 'queues'], true)) {
+            $id = $endpoint['ActionID'];
+            reply($client, ['Response' => 'Success', 'ActionID' => $id, 'EventList' => 'start']);
+            $event = $scenario === 'channels' ? 'CoreShowChannel' : 'QueueMember';
+            reply($client, ['Event' => $event, 'ActionID' => $id, 'Channel' => 'PJSIP/133-1', 'Name' => '7915', 'Status' => '1']);
+            reply($client, ['Event' => $scenario === 'channels' ? 'CoreShowChannelsComplete' : 'QueueStatusComplete', 'ActionID' => $id]);
+            fclose($client);
+            exit(0);
+        }
         if (($endpoint['Action'] ?? '') !== 'PJSIPShowEndpoint') { exit(4); }
         if ($scenario === 'ws') {
             reply($client, ['Response' => 'Error', 'ActionID' => $endpoint['ActionID'], 'Message' => 'Unable to find object']);
@@ -77,7 +86,15 @@ foreach (['numeric', 'text', 'ws', 'no-contacts', 'login-timeout', 'partial', 'w
     $state = null;
     try {
         $session = new EndpointStateAmiSession($address, 'fixture', 'fixture-secret', 0.3);
-        $state = (new EndpointStateSource($session))->read('222');
+        if (in_array($scenario, ['channels', 'queues'], true)) {
+            $snapshot = $session->sendRequestTimeout($scenario === 'channels' ? 'CoreShowChannels' : 'QueueStatus');
+            $event = $scenario === 'channels' ? 'CoreShowChannel' : 'QueueMember';
+            if (($snapshot['EventList'] ?? '') !== 'Complete' || count($snapshot['data'][$event] ?? []) !== 1) {
+                throw new RuntimeException('Snapshot must include rows and completion');
+            }
+        } else {
+            $state = (new EndpointStateSource($session))->read('222');
+        }
         if ($scenario === 'login-timeout') { throw new LogicException('Login timeout was accepted'); }
     } catch (RuntimeException $exception) {
         if ($scenario !== 'login-timeout') { throw $exception; }
@@ -91,7 +108,7 @@ foreach (['numeric', 'text', 'ws', 'no-contacts', 'login-timeout', 'partial', 'w
         if ($state !== ['registration' => 'Idle', 'hint' => 'Idle', 'custom' => 'NOT_INUSE']) { throw new RuntimeException('Complete snapshot not parsed: ' . $scenario); }
     } elseif ($scenario === 'no-contacts') {
         if ($state !== ['registration' => 'Unavailable', 'hint' => 'Unavailable', 'custom' => 'NOT_INUSE']) { throw new RuntimeException('Complete empty contact list must prove unregistered'); }
-    } elseif ($scenario !== 'login-timeout' && $state !== ['registration' => null, 'hint' => null, 'custom' => null]) {
+    } elseif (!in_array($scenario, ['login-timeout', 'channels', 'queues'], true) && $state !== ['registration' => null, 'hint' => null, 'custom' => null]) {
         throw new RuntimeException('Incomplete/unrelated response was accepted');
     }
 }

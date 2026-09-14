@@ -106,6 +106,59 @@ assert.equal(
   'the deployed browser asset must register its controller on window before document ready',
 );
 
+// Regression: formatting elapsed time as "1:00" must not hide a waiting call.
+for (const script of [source, builtSource]) {
+  const browser = createBrowserContext();
+  vm.runInContext(script, browser);
+  const controller = browser.__monitor;
+  const widgets = {};
+  const initialized = new Error('widgets captured');
+  browser.Date = class extends Date { static now() { return 2000000; } };
+  browser.Vue = function Vue(options) {
+    const widget = { ...options.data };
+    for (const [name, method] of Object.entries(options.methods)) {
+      widget[name] = method.bind(widget);
+    }
+    widgets[options.el] = widget;
+    if (options.el === '#calls') throw initialized;
+    return widget;
+  };
+  controller.initContactsCache = () => {};
+  controller.applyContactsCacheToQueueWidget = () => {};
+  assert.throws(() => controller.initialize(), error => error === initialized);
+  const queue = widgets['#app-queue'];
+  const calls = widgets['#calls'];
+  const template = fs.readFileSync(new URL('../App/Views/index.volt', import.meta.url), 'utf8');
+  const condition = template.match(/v-for="call in getQueueCalls\(queueId\)" v-if="([^"]+)"/)[1];
+  const queueRowVisible = new Function('widget', 'call', `with (widget) { return ${condition}; }`);
+  for (const [seconds, threshold, visible] of [
+    [29, 30, false], [30, 30, true], [59, 30, true], [60, 30, true],
+    [61, 30, true], [3600, 30, true], [60, 0, true], [60, 90, false], [90, 90, true],
+  ]) {
+    const call = { linkedid: 'waiting', start: 2000 - seconds, answer: '', dst_chan: '',
+      queueData: { EnterTime: 2000 - seconds } };
+    calls.minWaitVisible = queue.minWaitVisible = threshold;
+    queue.allCalls = [call];
+    queue.queues = { test: { callIds: ['waiting'] } };
+    assert.equal(calls.callIsVisible(call), visible, `table visibility at ${seconds}s / threshold ${threshold}`);
+    assert.equal(queue.hasWaitingCalls('test'), visible, `waiting indicator at ${seconds}s`);
+    assert.equal(queueRowVisible(queue, call), visible, `queue row at ${seconds}s`);
+  }
+  assert.equal(calls.getClientHeader('130', 'Caller'), 'Caller <130>', 'snapshot names work outside monitored queues');
+  calls.$nextTick = callback => callback();
+  browser.Extensions.updatePhonesRepresent = () => { throw new Error('Vue call labels must not be rewritten'); };
+  const mobile = { channel: 'PJSIP/trunk-1', number: '7915' };
+  const employee = { channel: 'PJSIP/133-1', number: '133' };
+  queue.queues = { test: { agents: { '133': { name: 'Employee' } } } };
+  for (const channels of [[mobile, employee], [employee], [{ ...mobile, channel: 'PJSIP/trunk-2' }, employee]]) {
+    calls.updatedCallsFromResponse({ calls: [{ linkedid: 'parallel', calledChannels: channels }], queues: {} });
+    assert.deepEqual(Array.from(calls.calls[0].calledChannels, ch => ch.channel), channels.map(ch => ch.channel));
+    assert.equal(calls.getClientHeader('133'), 'Employee <133>', 'employee name is rendered from Vue data');
+  }
+  assert.equal(controller.formatElapsedTime(1940), '1:00', 'display retains formatted time');
+  assert.equal(calls.callIsVisible({ dst_chan: 'answered', queueData: {} }), true);
+}
+
 assert.equal(
   JSON.stringify(monitor.normalizeActiveCallsPayload(undefined)),
   '{"calls":[],"queues":{}}',

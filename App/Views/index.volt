@@ -93,7 +93,7 @@
                     </div>
                 </h4>
                 <div class="ui relaxed divided list">
-                    <div v-for="call in getQueueCalls(queueId)" v-if="isWaitingQueueCall(call) && minWaitVisible <= formatElapsedTime(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
+                    <div v-for="call in getQueueCalls(queueId)" v-if="isWaitingQueueCall(call) && minWaitVisible <= getElapsedSeconds(call.queueData.EnterTime)" :key="call.linkedid" :data-linked-id="call.linkedid" class="item">
                         <div class="content">
                             <div class="header">
                                 <i v-if="hasClientByPhone(call.src_num)" class="address book outline icon" aria-hidden="true"></i>
@@ -197,30 +197,30 @@
                                                                                     'row-dialing': (call.dst_num === '' && call.calledChannels && call.calledChannels.length),
                                                                                   }">
       <td class="collapsing">  <% formatTimestampToTime(call.start) %> </td>
-      <td :class="{'right aligned': true, 'need-update': call.typeCall !== 'incoming'}" :data-phone="call.src_num" ><% getClientHeader(call.src_num) %></td>
+      <td class="right aligned" :data-phone="call.src_num" ><% getClientHeader(call.src_num, call.src_name) %></td>
 
       <!--  Номер назначения начало -->
-      <td v-if="call.dst_num" class="need-update" :data-phone="call.dst_num" :data-chan="call.dst_chan"><% getClientHeader(call.dst_num) %></td>
+      <td v-if="call.dst_num"  :data-phone="call.dst_num" :data-chan="call.dst_chan"><% getClientHeader(call.dst_num, call.dst_name) %></td>
       <td v-else-if="call.bridgeChannels && call.bridgeChannels.length" class="" :data-phone="call.src_num" :data-chan="call.src_chan">
-          <span v-for="bridge in call.bridgeChannels"  title="" class="ui mini basic label blue">
-              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="bridge.src_num" class="need-update"><% getClientHeader(bridge.src_num) %></span>
+          <span v-for="bridge in call.bridgeChannels" :key="'src-' + bridge.src_chan + '-' + bridge.dst_chan"  title="" class="ui mini basic label blue">
+              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="bridge.src_num" ><% getClientHeader(bridge.src_num, bridge.src_name) %></span>
           </span>
-          <span v-for="(bridge, index) in call.bridgeChannels" :key="'dst-' + index" title="" class="ui mini basic label blue">
-              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="bridge.dst_num" class="need-update"><% getClientHeader(bridge.dst_num) %></span>
+          <span v-for="bridge in call.bridgeChannels" :key="'dst-' + bridge.src_chan + '-' + bridge.dst_chan" title="" class="ui mini basic label blue">
+              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="bridge.dst_num" ><% getClientHeader(bridge.dst_num, bridge.dst_name) %></span>
           </span>
       </td>
       <td v-else-if="call.calledChannels && call.calledChannels.length" class="" :data-phone="call.src_num" :data-chan="call.src_chan">
-          <span v-for="chanData in call.calledChannels"  title="" class="ui mini basic label pink">
-              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="chanData.channel" class="need-update"><% getClientHeader(chanData.number) %></span>
+          <span v-for="chanData in call.calledChannels" :key="chanData.channel"  title="" class="ui mini basic label pink">
+              <i aria-hidden="true" class="circle icon"></i> <span :data-phone="chanData.number" :data-chan="chanData.channel" ><% getClientHeader(chanData.number, chanData.name) %></span>
           </span>
       </td>
       <td v-else-if="call.spyer" class="" :data-phone="call.src_num" :data-chan="call.src_chan">
           <span title="" class="ui mini basic label red">
               <i aria-hidden="true" class="user secret icon"></i>
-              <span :data-phone="call.src_num" :data-spyee-chan="call.spy_chan" class="need-update"><% call.spy_num %></span>
+              <span :data-phone="call.src_num" :data-spyee-chan="call.spy_chan" ><% call.spy_num %></span>
           </span>
       </td>
-      <td v-else class="" :data-phone="call.src_num" :data-chan="call.src_chan"><% getClientHeader(call.exten) %></td>
+      <td v-else class="" :data-phone="call.src_num" :data-chan="call.src_chan"><% getClientHeader(call.exten, call.exten_name) %></td>
       <!--  Номер назначения конец -->
 
       <td class='center aligned collapsing' >

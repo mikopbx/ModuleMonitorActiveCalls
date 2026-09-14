@@ -205,7 +205,7 @@ const ModuleMonitorActiveCalls = {
           for (var i = 0; i < calls.length; i++) {
             var call = calls[i];
             if (window[className].isWaitingQueueCall(call)) {
-              var elapsed = self.formatElapsedTime(call.queueData.EnterTime);
+              var elapsed = self.getElapsedSeconds(call.queueData.EnterTime);
               if (self.minWaitVisible <= elapsed) {
                 return true;
               }
@@ -256,12 +256,20 @@ const ModuleMonitorActiveCalls = {
           return this.contactsByPhone10[phone10] || '';
         },
         getClientHeader(phone) {
+          for (const queue of Object.values(this.queues)) {
+            const agent = queue.agents && queue.agents[String(phone)];
+            if (agent && agent.name) return `${agent.name} <${phone}>`;
+          }
           const client = this.getClientNameByPhone(phone);
           if (!client) return phone;
           return `${client} <${phone}>`;
         },
         hasClientByPhone(phone) {
           return !!this.getClientNameByPhone(phone);
+        },
+        getElapsedSeconds(enterTime) {
+          void this.nowTick;
+          return window[className].getElapsedSeconds(enterTime);
         },
         formatElapsedTime(enterTime) {
           // Make this method reactive to the UI ticker.
@@ -603,7 +611,7 @@ const ModuleMonitorActiveCalls = {
         callIsVisible(call) {
           void this.nowTick;
           if (call.dst_chan === '' && call.queueData.EnterTime !== undefined) {
-            return this.minWaitVisible <= this.getWaitTime(call);
+            return this.minWaitVisible <= this.getWaitSeconds(call);
           }
           return true;
         },
@@ -620,12 +628,15 @@ const ModuleMonitorActiveCalls = {
           return `${hours}:${minutes}:${seconds}`;
         },
         getWaitTime(call) {
+          return window[className].secondToTime(this.getWaitSeconds(call));
+        },
+        getWaitSeconds(call) {
           void this.nowTick;
           let answer = Math.floor(Date.now() / 1000);
           if (call.answer !== '') {
             answer = call.answer;
           }
-          return window[className].secondToTime(answer - call.start);
+          return Math.max(0, answer - call.start);
         },
         getCallTime(call) {
           void this.nowTick;
@@ -638,14 +649,12 @@ const ModuleMonitorActiveCalls = {
           const payload = window[className].normalizeActiveCallsPayload(data);
           this.minWaitVisible = 1 * $('#minWaitVisibleValue').val();
           this.calls = window[className].collectDisplayCalls(payload);
-          this.$nextTick(() => {
-            Extensions.updatePhonesRepresent('need-update');
-          });
         },
         formatElapsedTime(enterTime) {
           return window[className].formatElapsedTime(enterTime);
         },
-        getClientHeader(phone) {
+        getClientHeader(phone, name) {
+          if (name) return `${name} <${phone}>`;
           const q = window[className].$widgetQueues;
           if (q && typeof q.getClientHeader === 'function') {
             return q.getClientHeader(phone);
@@ -1242,9 +1251,10 @@ const ModuleMonitorActiveCalls = {
   },
   formatElapsedTime(enterTime) {
     if (!enterTime) return '—';
-    const now = Math.floor(Date.now() / 1000);
-    const diffSeconds = now - enterTime;
-    return window[className].secondToTime(diffSeconds);
+    return window[className].secondToTime(this.getElapsedSeconds(enterTime));
+  },
+  getElapsedSeconds(enterTime) {
+    return Math.max(0, Math.floor(Date.now() / 1000) - Number(enterTime));
   },
   secondToTime(diffSeconds) {
     if (diffSeconds < 0) return '0';
