@@ -26,7 +26,9 @@ final class EndpointStateAmiSession
             if (!is_resource($this->socket)) {
                 throw new RuntimeException('AMI connection failed');
             }
-            if (strpos($this->readLine(), 'Asterisk Call Manager/') !== 0) {
+            // MikoPBX rebrands the AMI banner ("PBX Call Manager/..." instead of
+            // "Asterisk Call Manager/..."), so match the version-independent substring.
+            if (strpos($this->readLine(), 'Call Manager/') === false) {
                 throw new RuntimeException('Invalid AMI greeting');
             }
             $login = $this->sendRequestTimeout('Login', ['Username' => $username, 'Secret' => $secret, 'Events' => 'off']);
