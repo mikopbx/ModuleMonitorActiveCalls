@@ -28,8 +28,10 @@ final class EndpointStateAmiSession
             }
             // MikoPBX rebrands the AMI banner ("PBX Call Manager/..." instead of
             // "Asterisk Call Manager/..."), so match the version-independent substring.
-            if (strpos($this->readLine(), 'Call Manager/') === false) {
-                throw new RuntimeException('Invalid AMI greeting');
+            $greeting = $this->readLine();
+            if (strpos($greeting, 'Call Manager/') === false) {
+                // Surface the actual banner so an unexpected greeting is diagnosable from the log.
+                throw new RuntimeException('Invalid AMI greeting: ' . substr($greeting, 0, 100));
             }
             $login = $this->sendRequestTimeout('Login', ['Username' => $username, 'Secret' => $secret, 'Events' => 'off']);
             if (($login['Response'] ?? '') !== 'Success') {
