@@ -26,10 +26,11 @@ final class EndpointStateAmiSession
             if (!is_resource($this->socket)) {
                 throw new RuntimeException('AMI connection failed');
             }
-            // MikoPBX rebrands the AMI banner ("PBX Call Manager/..." instead of
-            // "Asterisk Call Manager/..."), so match the version-independent substring.
+            // MikoPBX rebrands the AMI banner and drops the version suffix: the greeting is
+            // "PBX Call Manager" (no "/x.x.x"), not "Asterisk Call Manager/...". Match the
+            // brand- and version-independent "Call Manager" substring.
             $greeting = $this->readLine();
-            if (strpos($greeting, 'Call Manager/') === false) {
+            if (strpos($greeting, 'Call Manager') === false) {
                 // Surface the actual banner so an unexpected greeting is diagnosable from the log.
                 throw new RuntimeException('Invalid AMI greeting: ' . substr($greeting, 0, 100));
             }
