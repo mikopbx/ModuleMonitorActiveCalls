@@ -910,6 +910,71 @@ class WorkerActiveCalls extends WorkerBase
     }
 
     /**
+     * Переносит ВСЕ данные одного linkedId в другой (слияние двух веток в один вызов).
+     *
+     * Используется, когда Asterisk через SwapUniqueid сигнализирует, что входящий канал
+     * занял место канала из другого linkedId в том же бридже (например, транзитная
+     * Local-нога перехвата *8 и реальный звонок — это один вызов). В отличие от
+     * migrateChannel(), который переносит один канал по явно заданному источнику,
+     * этот метод сам находит все каналы старого linkedId и не зависит от устаревшего
+     * сохранённого initial_linkedid.
+     *
+     * @param string $oldLinkedId linkedId-источник (будет удалён)
+     * @param string $newLinkedId канонический linkedId-приёмник
+     */
+    private function migrateLinkedId(string $oldLinkedId, string $newLinkedId): void
+    {
+        if ($oldLinkedId === $newLinkedId) {
+            return;
+        }
+
+        // 1. Переносим все отслеживаемые каналы (с метаданными и bridge-записями).
+        //    array_keys — снимок, т.к. migrateChannel модифицирует activeChannels[$oldLinkedId].
+        if (isset($this->activeChannels[$oldLinkedId])) {
+            foreach (array_keys($this->activeChannels[$oldLinkedId]) as $ch) {
+                $this->migrateChannel($ch, $oldLinkedId, $newLinkedId);
+                $this->channelLinkedIds[$ch] = $newLinkedId;
+            }
+        }
+
+        // 2. Складываем оставшиеся bridge-записи (например, только Local-каналы, которых
+        //    нет в activeChannels), чтобы findBridgeChannel продолжал их резолвить.
+        if (isset($this->activeBridges[$oldLinkedId])) {
+            foreach ($this->activeBridges[$oldLinkedId] as $bridgeId => $channels) {
+                foreach ($channels as $ch => $ts) {
+                    if (!isset($this->activeBridges[$newLinkedId][$bridgeId][$ch])) {
+                        $this->activeBridges[$newLinkedId][$bridgeId][$ch] = $ts;
+                    }
+                }
+            }
+            unset($this->activeBridges[$oldLinkedId]);
+        }
+
+        // 3. callType / spyer переносим, только если их не перенёс п.1 (старый linkedId
+        //    содержал лишь неотслеживаемые каналы). Приёмник имеет приоритет — у него
+        //    метаданные реального вызова, у источника — транзитной ноги.
+        if (isset($this->callType[$oldLinkedId])) {
+            if (!isset($this->callType[$newLinkedId])) {
+                $this->callType[$newLinkedId] = $this->callType[$oldLinkedId];
+            }
+            unset($this->callType[$oldLinkedId]);
+        }
+        if (isset($this->spyerChannels[$oldLinkedId])) {
+            if (!isset($this->spyerChannels[$newLinkedId])) {
+                $this->spyerChannels[$newLinkedId] = $this->spyerChannels[$oldLinkedId];
+            }
+            unset($this->spyerChannels[$oldLinkedId]);
+        }
+
+        // 4. Алиас old→new (resolveLinkedId развернёт цепочки). Снимаем обратный алиас,
+        //    чтобы не создать 2-цикл new↔old.
+        if (($this->linkedIdAliases[$newLinkedId] ?? '') === $oldLinkedId) {
+            unset($this->linkedIdAliases[$newLinkedId]);
+        }
+        $this->linkedIdAliases[$oldLinkedId] = $newLinkedId;
+    }
+
+    /**
      * Поиск связанного канала.
      * @param $linkedId
      * @param $dstChannel
@@ -1500,7 +1565,8 @@ class WorkerActiveCalls extends WorkerBase
             $swapUniqueid = $parameters['SwapUniqueid'] ?? '';
 
             if (!empty($linkedId) && !empty($bridgeUniqueid) && !empty($beChannel)) {
-                // Handle SwapUniqueid - links two linkedIds during call pickup
+                // Handle SwapUniqueid - Asterisk signals that $beChannel replaced the channel
+                // with uniqueid=$swapUniqueid in this bridge, i.e. both legs are one call.
                 if (!empty($swapUniqueid)) {
                     $swapLinkedId = '';
                     foreach ($this->activeChannels as $lid => $channels) {
@@ -1514,6 +1580,33 @@ class WorkerActiveCalls extends WorkerBase
 
                     if (!empty($swapLinkedId) && $swapLinkedId !== $linkedId) {
                         $this->linkedIdAliases[$swapLinkedId] = $linkedId;
+                    } elseif (empty($swapLinkedId)) {
+                        // Канал, чьё место заняли, не отслеживается в activeChannels — обычно это
+                        // транзитная Local-нога originate/interception. Через неё Asterisk
+                        // перепривязывает канал перехвата *8, из-за чего тот остаётся под чужим
+                        // linkedId и в UI появляется второй (фантомный) вызов. Сводим в linkedId
+                        // входящего канала любой ДРУГОЙ linkedId, у которого остались каналы в этом
+                        // бридже, НО только если он содержит канал перехвата — чтобы не затронуть
+                        // attended transfer и ChanSpy.
+                        $mergeLinkedIds = [];
+                        foreach ($this->activeBridges as $lid => $bridges) {
+                            if ($lid === $linkedId || empty($bridges[$bridgeUniqueid])) {
+                                continue;
+                            }
+                            foreach (array_keys($bridges[$bridgeUniqueid]) as $bridgeChannel) {
+                                if (isset($this->pickupChannels[$bridgeChannel])) {
+                                    $mergeLinkedIds[$lid] = true;
+                                    break;
+                                }
+                            }
+                        }
+                        foreach (array_keys($mergeLinkedIds) as $lid) {
+                            $this->logger->writeInfo(
+                                "SwapUniqueid pickup reconcile: merging linkedId $lid into $linkedId " .
+                                "(bridge=$bridgeUniqueid, swapUniqueid=$swapUniqueid)"
+                            );
+                            $this->migrateLinkedId($lid, $linkedId);
+                        }
                     }
                 }
 
